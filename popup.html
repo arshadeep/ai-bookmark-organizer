@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Bookmark Organizer</title>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>AI Bookmark Organizer</h1>
+    
+    <div class="bookmark-info">
+      <div class="page-title" id="pageTitle">Loading page title...</div>
+      <div class="page-url" id="pageUrl">Loading URL...</div>
+    </div>
+    
+    <div class="status-message" id="statusMessage">
+      <div class="loader" id="loader"></div>
+      <span id="statusText">Analyzing page content...</span>
+    </div>
+    
+    <div class="folder-section">
+      <label for="folderSelect">Folder:</label>
+      <div class="folder-select-container">
+        <select id="folderSelect" disabled>
+          <option value="">Loading folders...</option>
+        </select>
+        <button id="refreshFolders" title="Refresh folder list">↻</button>
+      </div>
+      <div class="suggested-folder">
+        <span>AI Suggestion: </span>
+        <span id="suggestedFolder">Analyzing...</span>
+      </div>
+    </div>
+    
+    <div class="notes-section">
+      <label for="notesInput">Notes (optional):</label>
+      <textarea id="notesInput" placeholder="Add notes about this bookmark..."></textarea>
+    </div>
+    
+    <div class="actions">
+      <button id="saveBtn" disabled>Save Bookmark</button>
+      <button id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Bookmark Organizer Options</title>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: #1a73e8;
+      margin-bottom: 20px;
+    }
+    
+    .section {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    
+    button {
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    button:hover {
+      background-color: #0d62d1;
+    }
+    
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    
+    .info-text {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+    
+    .instructions {
+      background: #e8f0fe;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 30px;
+    }
+    
+    .instructions h2 {
+      margin-top: 0;
+      color: #1a73e8;
+    }
+    
+    .instructions ol {
+      padding-left: 20px;
+    }
+    
+    .instructions li {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>AI Bookmark Organizer - Settings</h1>
+  
+  <div class="section">
+    <h2>Gemini API Configuration</h2>
+    <div class="form-group">
+      <label for="apiKey">Gemini API Key</label>
+      <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
+      <p class="info-text">Your API key is stored locally on your device and is never sent to our servers.</p>
+    </div>
+    
+    <button id="saveBtn">Save Settings</button>
+    <div id="status" class="status" style="display: none;"></div>
+  </div>
+  
+  <div class="instructions">
+    <h2>How to Get a Gemini API Key</h2>
+    <ol>
+      <li>Go to <a href="https://ai.google.dev/" target="_blank">Google AI Studio</a></li>
+      <li>Sign in with your Google account</li>
+      <li>Go to the API keys section</li>
+      <li>Create a new API key</li>
+      <li>Copy and paste the key here</li>
+    </ol>
+    <p>The extension needs this API key to categorize your bookmarks using Google's Gemini AI.</p>
+  </div>
+  
+  <div class="section">
+    <h2>About AI Bookmark Organizer</h2>
+    <p>This extension automatically categorizes your bookmarks using Google Gemini AI.</p>
+    <p>When you bookmark a page, the extension will:</p>
+    <ul>
+      <li>Analyze the page content</li>
+      <li>Suggest the best folder based on the content</li>
+      <li>Save the bookmark in the suggested folder or create a new one</li>
+    </ul>
+    <p>Version 1.0</p>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>
