@@ -7,6 +7,9 @@ let currentPageData = {
   metadata: {}
 };
 
+// Variable to track if the suggestion came from pattern matching
+let isPatternBasedSuggestion = false;
+
 // Elements from the DOM
 const elements = {
   pageTitle: document.getElementById('pageTitle'),
@@ -14,6 +17,11 @@ const elements = {
   aboutInput: document.getElementById('aboutInput'),
   folderSelect: document.getElementById('folderSelect'),
   suggestedFolder: document.getElementById('suggestedFolder'),
+  patternMatchContainer: document.getElementById('patternMatchContainer'),
+  patternMatchText: document.getElementById('patternMatchText'),
+  patternInfoBtn: document.getElementById('patternInfoBtn'),
+  patternInfoModal: document.getElementById('patternInfoModal'),
+  closePatternInfo: document.getElementById('closePatternInfo'),
   notesInput: document.getElementById('notesInput'),
   pageSummary: document.getElementById('pageSummary'),
   saveBtn: document.getElementById('saveBtn'),
@@ -88,6 +96,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   elements.cancelBtn.addEventListener('click', () => window.close());
   elements.refreshFolders.addEventListener('click', loadBookmarkFolders);
   elements.aboutInput.addEventListener('input', debounce(refreshSuggestion, 500));
+  
+  // Pattern info modal handlers
+  elements.patternInfoBtn.addEventListener('click', () => {
+    elements.patternInfoModal.style.display = 'block';
+  });
+  
+  elements.closePatternInfo.addEventListener('click', () => {
+    elements.patternInfoModal.style.display = 'none';
+  });
+  
+  // Close modal if user clicks outside of it
+  window.addEventListener('click', (event) => {
+    if (event.target === elements.patternInfoModal) {
+      elements.patternInfoModal.style.display = 'none';
+    }
+  });
 });
 
 // Debounce function to prevent excessive API calls
@@ -105,6 +129,9 @@ async function refreshSuggestion() {
   const userDescription = elements.aboutInput.value.trim();
   if (userDescription) {
     elements.suggestedFolder.textContent = "Updating...";
+    // Hide pattern match indicator when user provides custom description
+    elements.patternMatchContainer.style.display = 'none';
+    isPatternBasedSuggestion = false;
     await getAISuggestion();
   }
 }
@@ -184,20 +211,56 @@ async function getAISuggestion() {
     const userDescription = elements.aboutInput.value.trim();
     const userNotes = elements.notesInput.value.trim();
     
+    // First, check if there's a pattern match from user's existing bookmarks
+    let patternRecommendation = null;
+    try {
+      patternRecommendation = await chrome.runtime.sendMessage({
+        action: "getUserPatternRecommendation",
+        content: currentPageData.content,
+        title: currentPageData.title
+      });
+      
+      // If there's a good pattern match, show the pattern match indicator
+      if (patternRecommendation && patternRecommendation.recommendation) {
+        isPatternBasedSuggestion = true;
+        
+        // Only show pattern match indicator if user hasn't provided their own description
+        if (!userDescription) {
+          elements.patternMatchContainer.style.display = 'flex';
+          
+          // Customize the message based on confidence score
+          const confidence = patternRecommendation.recommendation.confidence || 'low';
+          if (confidence === 'high') {
+            elements.patternMatchText.textContent = "Strong match with your bookmarking patterns";
+          } else {
+            elements.patternMatchText.textContent = "Based on your bookmarking patterns";
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Could not get user pattern recommendation:", error);
+      // Continue with AI recommendation only
+      isPatternBasedSuggestion = false;
+      elements.patternMatchContainer.style.display = 'none';
+    }
+    
     // Get existing folders for context
     const existingFolders = Array.from(elements.folderSelect.options)
       .filter(option => option.value !== 'new' && option.value !== '')
       .map(option => option.textContent)
       .join(', ');
     
+    // Extract top categories from existing folder structure
+    const topCategories = analyzeExistingFolders(elements.folderSelect.options);
+    
     // Prepare content for Gemini
-    const prompt = `Based on the webpage information below, suggest the most appropriate bookmark folder. 
+    const prompt = `Based on the webpage information below, suggest the most appropriate bookmark folder. The user has a specific way of organizing bookmarks.
 
 Title: ${currentPageData.title}
 URL: ${currentPageData.url}
 ${userDescription ? `Description provided by user: ${userDescription}` : ''}
 ${userNotes ? `Note provided by user: ${userNotes}` : ''}
-${currentPageData.summary ? `50 word summary of page content: ${currentPageData.summary}` : ''}
+${currentPageData.summary ? `Summary of page content: ${currentPageData.summary}` : ''}
 ${currentPageData.metadata.keywords ? `Keywords: ${currentPageData.metadata.keywords}` : ''}
 
 Content excerpt:
@@ -205,13 +268,18 @@ ${currentPageData.content.substring(0, 500)}...
 
 Existing bookmark folders: ${existingFolders || "None"}
 
+Common categories in user's bookmark structure: ${topCategories}
+
+${patternRecommendation && patternRecommendation.recommendation ? `IMPORTANT: Based on the user's bookmarking patterns, this content may belong in the folder: "${patternRecommendation.recommendation.path}"` : ''}
+
 First decide if one of the existing folders is appropriate or if a new folder should be created.
+${patternRecommendation && patternRecommendation.recommendation ? 'Strongly consider the pattern-based recommendation provided above unless you have a compelling reason not to.' : ''}
 Then respond in this exact format:
 USE_EXISTING: [folder name] 
 or 
 CREATE_NEW: [new folder name]
 
-The folder name should be short (1-3 words) and descriptive.`;
+The folder name should be short (1-3 words) and descriptive of the topic.`;
 
     // Send request to background script
     const response = await chrome.runtime.sendMessage({
@@ -273,6 +341,33 @@ The folder name should be short (1-3 words) and descriptive.`;
   }
 }
 
+// Function to analyze existing folders and extract common categories
+function analyzeExistingFolders(options) {
+  // Extract folder names from options
+  const folderNames = Array.from(options)
+    .filter(option => option.value !== 'new' && option.value !== '')
+    .map(option => {
+      // Get the last part of the path (the actual folder name)
+      const parts = option.textContent.split(' > ');
+      return parts[parts.length - 1];
+    });
+  
+  // Count occurrences of each category
+  const categoryCounts = {};
+  folderNames.forEach(name => {
+    categoryCounts[name] = (categoryCounts[name] || 0) + 1;
+  });
+  
+  // Sort by frequency and take top 10
+  const topCategories = Object.entries(categoryCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(entry => entry[0])
+    .join(', ');
+  
+  return topCategories;
+}
+
 // Save the bookmark
 async function saveBookmark() {
   updateStatus("Saving bookmark...");
@@ -294,6 +389,35 @@ async function saveBookmark() {
       if (currentPageData.summary.length > 100) {
         bookmarkTitle += '...';
       }
+    }
+    
+    // Record this bookmark action for pattern learning
+    try {
+      // Store some metadata about this bookmark action for future learning
+      chrome.storage.local.get('bookmarkingHistory', (result) => {
+        const history = result.bookmarkingHistory || [];
+        
+        // Add new entry
+        history.push({
+          url: currentPageData.url,
+          title: currentPageData.title, 
+          selectedFolder: selectedFolder === 'new' ? elements.suggestedFolder.textContent : 
+                         Array.from(elements.folderSelect.options)
+                           .find(opt => opt.value === selectedFolder)?.textContent || '',
+          wasPatternBased: isPatternBasedSuggestion,
+          timestamp: Date.now()
+        });
+        
+        // Keep only the last 100 entries to prevent storage issues
+        if (history.length > 100) {
+          history.shift();
+        }
+        
+        chrome.storage.local.set({ 'bookmarkingHistory': history });
+      });
+    } catch (e) {
+      // Non-critical error, continue with bookmark creation
+      console.warn("Could not save bookmark action to history:", e);
     }
     
     // Handle creating new folder if needed

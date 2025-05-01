@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI Bookmark Organizer",
-  "version": "1.1",
-  "description": "Automatically categorize bookmarks using Google Gemini AI with smart content analysis",
+  "version": "1.2",
+  "description": "Automatically categorize bookmarks using Google Gemini AI with smart pattern recognition",
   "permissions": [
     "bookmarks",
     "tabs",

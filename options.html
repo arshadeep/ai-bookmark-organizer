@@ -36,13 +36,28 @@
       font-weight: 500;
     }
     
-    input[type="text"], input[type="password"] {
+    input[type="text"], input[type="password"], input[type="range"] {
       width: 100%;
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
       font-size: 14px;
       box-sizing: border-box;
+    }
+    
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .slider-container input[type="range"] {
+      flex-grow: 1;
+    }
+    
+    .slider-value {
+      min-width: 30px;
+      text-align: center;
     }
     
     button {
@@ -101,45 +116,283 @@
     .instructions li {
       margin-bottom: 10px;
     }
+    
+    .tab-container {
+      margin-bottom: 20px;
+    }
+    
+    .tab-buttons {
+      display: flex;
+      border-bottom: 1px solid #ccc;
+    }
+    
+    .tab-button {
+      padding: 10px 15px;
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    
+    .tab-button.active {
+      color: #1a73e8;
+      border-bottom: 2px solid #1a73e8;
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 15px 0;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .pattern-card {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 10px;
+    }
+    
+    .pattern-folder {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .pattern-keywords {
+      font-size: 13px;
+      color: #666;
+    }
+    
+    .keyword-chip {
+      display: inline-block;
+      background: #e0e0e0;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+    
+    .pattern-stats {
+      font-size: 12px;
+      color: #1a73e8;
+      margin-top: 5px;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+      background-color: #1a73e8;
+    }
+    
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .setting-label {
+      font-weight: 500;
+    }
+    
+    .setting-description {
+      font-size: 13px;
+      color: #666;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
   <h1>AI Bookmark Organizer - Settings</h1>
   
-  <div class="section">
-    <h2>Gemini API Configuration</h2>
-    <div class="form-group">
-      <label for="apiKey">Gemini API Key</label>
-      <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
-      <p class="info-text">Your API key is stored locally on your device and is never sent to our servers.</p>
+  <div class="tab-container">
+    <div class="tab-buttons">
+      <button class="tab-button active" data-tab="api-settings">API Settings</button>
+      <button class="tab-button" data-tab="pattern-settings">Pattern Recognition</button>
+      <button class="tab-button" data-tab="patterns">Your Bookmark Patterns</button>
+      <button class="tab-button" data-tab="about">About</button>
     </div>
     
-    <button id="saveBtn">Save Settings</button>
-    <div id="status" class="status" style="display: none;"></div>
-  </div>
-  
-  <div class="instructions">
-    <h2>How to Get a Gemini API Key</h2>
-    <ol>
-      <li>Go to <a href="https://ai.google.dev/" target="_blank">Google AI Studio</a></li>
-      <li>Sign in with your Google account</li>
-      <li>Go to the API keys section</li>
-      <li>Create a new API key</li>
-      <li>Copy and paste the key here</li>
-    </ol>
-    <p>The extension needs this API key to categorize your bookmarks using Google's Gemini AI.</p>
-  </div>
-  
-  <div class="section">
-    <h2>About AI Bookmark Organizer</h2>
-    <p>This extension automatically categorizes your bookmarks using Google Gemini AI.</p>
-    <p>When you bookmark a page, the extension will:</p>
-    <ul>
-      <li>Analyze the page content</li>
-      <li>Suggest the best folder based on the content</li>
-      <li>Save the bookmark in the suggested folder or create a new one</li>
-    </ul>
-    <p>Version 1.0</p>
+    <!-- API Settings Tab -->
+    <div id="api-settings" class="tab-content active">
+      <div class="section">
+        <h2>Gemini API Configuration</h2>
+        <div class="form-group">
+          <label for="apiKey">Gemini API Key</label>
+          <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
+          <p class="info-text">Your API key is stored locally on your device and is never sent to our servers.</p>
+        </div>
+        
+        <button id="saveApiBtn">Save API Settings</button>
+        <div id="apiStatus" class="status" style="display: none;"></div>
+      </div>
+      
+      <div class="instructions">
+        <h2>How to Get a Gemini API Key</h2>
+        <ol>
+          <li>Go to <a href="https://ai.google.dev/" target="_blank">Google AI Studio</a></li>
+          <li>Sign in with your Google account</li>
+          <li>Go to the API keys section</li>
+          <li>Create a new API key</li>
+          <li>Copy and paste the key here</li>
+        </ol>
+        <p>The extension needs this API key to categorize your bookmarks using Google's Gemini AI.</p>
+      </div>
+    </div>
+    
+    <!-- Pattern Recognition Settings Tab -->
+    <div id="pattern-settings" class="tab-content">
+      <div class="section">
+        <h2>Pattern Recognition Settings</h2>
+        <p class="info-text">Configure how the extension learns from your bookmarking patterns to provide personalized suggestions.</p>
+        
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Enable Pattern Recognition</div>
+            <div class="setting-description">Learn from your bookmarking habits to suggest better folders</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="enablePatterns" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        
+        <div class="form-group">
+          <label for="patternWeight">Pattern Influence</label>
+          <div class="slider-container">
+            <input type="range" id="patternWeight" min="0" max="100" value="50">
+            <span class="slider-value" id="patternWeightValue">50%</span>
+          </div>
+          <p class="info-text">How much your existing bookmark patterns influence new suggestions. Higher values prioritize your patterns over general AI suggestions.</p>
+        </div>
+        
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Consider Folder Hierarchy</div>
+            <div class="setting-description">Suggest subfolders based on parent folder context</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="considerHierarchy" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Auto-Update Patterns</div>
+            <div class="setting-description">Continuously learn from new bookmark actions</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autoUpdatePatterns" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        
+        <button id="resetPatterns">Reset Learning Data</button>
+        <p class="info-text">This will clear all learned bookmark patterns and start fresh.</p>
+        
+        <button id="savePatternBtn">Save Pattern Settings</button>
+        <div id="patternStatus" class="status" style="display: none;"></div>
+      </div>
+    </div>
+    
+    <!-- Patterns Tab -->
+    <div id="patterns" class="tab-content">
+      <div class="section">
+        <h2>Your Bookmark Pattern Analysis</h2>
+        <p class="info-text">These are the patterns detected in your bookmark organization. The extension uses these to make better folder suggestions.</p>
+        
+        <div id="patternsList">
+          <div class="pattern-card">
+            <div class="pattern-folder">Tech > Programming</div>
+            <div class="pattern-keywords">
+              <span class="keyword-chip">javascript</span>
+              <span class="keyword-chip">coding</span>
+              <span class="keyword-chip">development</span>
+              <span class="keyword-chip">tutorial</span>
+              <span class="keyword-chip">github</span>
+            </div>
+            <div class="pattern-stats">18 bookmarks · High confidence</div>
+          </div>
+          
+          <div class="pattern-card">
+            <div class="pattern-folder">Recipes</div>
+            <div class="pattern-keywords">
+              <span class="keyword-chip">cooking</span>
+              <span class="keyword-chip">recipe</span>
+              <span class="keyword-chip">food</span>
+              <span class="keyword-chip">ingredient</span>
+              <span class="keyword-chip">meal</span>
+            </div>
+            <div class="pattern-stats">7 bookmarks · Medium confidence</div>
+          </div>
+          
+          <p class="info-text">Loading your bookmark patterns...</p>
+        </div>
+        
+        <button id="refreshPatterns">Refresh Patterns</button>
+      </div>
+    </div>
+    
+    <!-- About Tab -->
+    <div id="about" class="tab-content">
+      <div class="section">
+        <h2>About AI Bookmark Organizer</h2>
+        <p>This extension automatically categorizes your bookmarks using Google Gemini AI and learns from your organization patterns.</p>
+        <p>When you bookmark a page, the extension will:</p>
+        <ul>
+          <li>Analyze the page content</li>
+          <li>Learn from your existing bookmark organization</li>
+          <li>Suggest the best folder based on content and your patterns</li>
+          <li>Save the bookmark in the suggested folder or create a new one</li>
+        </ul>
+        <p>Version 1.2 - Pattern Learning Edition</p>
+      </div>
+    </div>
   </div>
   
   <script src="options.js"></script>

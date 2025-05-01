@@ -36,6 +36,11 @@
         <span>AI Suggestion: </span>
         <span id="suggestedFolder">Analyzing...</span>
       </div>
+      <div class="pattern-match" id="patternMatchContainer" style="display: none;">
+        <span class="pattern-match-icon">📊</span>
+        <span id="patternMatchText">Based on your bookmarking patterns</span>
+        <button id="patternInfoBtn" title="Learn more about pattern matching" class="info-button">?</button>
+      </div>
     </div>
     
     <div class="notes-section">
@@ -46,6 +51,16 @@
     <div class="page-summary" id="pageSummarySection">
       <label for="pageSummary">Page Summary:</label>
       <div id="pageSummary" class="summary-text">Generating summary...</div>
+    </div>
+    
+    <div class="pattern-info-modal" id="patternInfoModal" style="display: none;">
+      <div class="pattern-info-content">
+        <span class="close-btn" id="closePatternInfo">&times;</span>
+        <h3>Smart Pattern Recognition</h3>
+        <p>This suggestion is based on analyzing your existing bookmark organization patterns.</p>
+        <p>The extension learns how you typically organize similar content and suggests folders accordingly.</p>
+        <p>This helps maintain consistency with your personal organizational style.</p>
+      </div>
     </div>
     
     <div class="actions">
