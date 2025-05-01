@@ -21,7 +21,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })
       .catch(error => {
         console.error("Summary generation error:", error);
-        sendResponse({ error: error.message, fallbackSummary: request.fallbackSummary });
+        // Include alternativeContext if available
+        if (error.alternativeContext) {
+          sendResponse({ 
+            error: error.message, 
+            fallbackSummary: request.fallbackSummary,
+            alternativeContext: error.alternativeContext 
+          });
+        } else {
+          sendResponse({ error: error.message, fallbackSummary: request.fallbackSummary });
+        }
       });
     
     // Return true to indicate we will send a response asynchronously
@@ -193,7 +202,14 @@ Respond with ONLY the summary, nothing else. The summary should clearly identify
     }
   } catch (error) {
     console.error("Error in generatePageSummary:", error);
-    throw error;
+    
+    // NEW: Extract alternative context from URL and metadata
+    const alternativeContext = extractContextFromUrlAndMetadata(metadata);
+    
+    // Return the error but also include alternative context
+    const enhancedError = new Error(error.message);
+    enhancedError.alternativeContext = alternativeContext;
+    throw enhancedError;
   }
 }
 
@@ -388,4 +404,60 @@ async function getUserPatternFolderRecommendation(pageContent, title) {
     console.error("Error in getUserPatternFolderRecommendation:", error);
     return { error: error.message };
   }
+}
+
+// NEW FUNCTION: Extract context from URL and metadata when summary generation fails
+function extractContextFromUrlAndMetadata(metadata) {
+  let context = {};
+  
+  // 1. Extract topics from title
+  if (metadata.title) {
+    // Remove common web terms and extract potential topics
+    const titleTerms = metadata.title
+      .replace(/\s-\s.*$/, '') // Remove site names after dash
+      .replace(/\|.*$/, '')    // Remove site names after pipe
+      .split(/\s+/)
+      .filter(word => 
+        word.length > 3 && 
+        !['http', 'https', 'www', 'com', 'org', 'the', 'and', 'for'].includes(word.toLowerCase())
+      );
+    
+    context.titleTerms = titleTerms;
+  }
+  
+  // 2. Extract domain and path from URL if available
+  if (metadata.url) {
+    try {
+      const url = new URL(metadata.url);
+      
+      // Get domain without www
+      const domain = url.hostname.replace('www.', '');
+      
+      // Extract meaningful parts from path (removing common web paths)
+      const pathParts = url.pathname.split('/')
+        .filter(part => 
+          part.length > 0 && 
+          !['index', 'home', 'page', 'article', 'post', 'view'].includes(part.toLowerCase())
+        );
+      
+      context.domain = domain;
+      context.pathParts = pathParts;
+      
+      // Special case for common sites
+      if (domain.includes('github.com')) {
+        context.likelySite = 'Programming/GitHub';
+      } else if (domain.includes('stackoverflow.com')) {
+        context.likelySite = 'Programming/StackOverflow';
+      } else if (domain.includes('medium.com')) {
+        context.likelySite = 'Articles';
+      } else if (domain.includes('youtube.com')) {
+        context.likelySite = 'Videos';
+      }
+      // Add more site-specific logic here
+    } catch (error) {
+      console.error("Error parsing URL:", error);
+    }
+  }
+  
+  return context;
 }
