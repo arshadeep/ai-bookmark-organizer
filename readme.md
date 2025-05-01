@@ -1,10 +1,13 @@
 # AI Bookmark Organizer
 
-A Chrome extension that automatically categorizes your bookmarks using Google's Gemini AI.
+A Chrome extension that automatically categorizes your bookmarks using Google's Gemini AI with enhanced content analysis.
 
 ## Features
 
 - **AI-Powered Categorization**: Analyzes page content to suggest the most appropriate folder
+- **User Context Integration**: Add your own description of what the article is about for better categorization
+- **Smart Content Analysis**: Advanced page scraping to extract meaningful content
+- **Automatic Summarization**: Creates concise 50-word summaries of bookmarked pages
 - **Smart Folder Management**: Saves to existing folders or creates new ones automatically
 - **Optional Notes**: Add custom notes to your bookmarks
 - **Native Chrome Integration**: Works directly with Chrome's bookmark system
@@ -32,8 +35,10 @@ A Chrome extension that automatically categorizes your bookmarks using Google's 
 1. Navigate to a webpage you want to bookmark
 2. Click the AI Bookmark Organizer icon in your toolbar
 3. The extension will analyze the page and suggest a category
-4. Add optional notes if desired
-5. Click "Save Bookmark" to save the page to the suggested folder (or choose a different one)
+4. (Optional) Describe what the article is about to improve categorization
+5. View the AI-generated summary of the page
+6. Add optional notes if desired
+7. Click "Save Bookmark" to save the page to the suggested folder (or choose a different one)
 
 ## Folder Structure
 
@@ -61,9 +66,16 @@ ai-bookmark-organizer/
   - `tabs`: To access the current tab
   - `activeTab`: To extract content from the current page
   - `storage`: To store API key and settings
+  - `scripting`: For enhanced content extraction
 
-- **API Integration**:
-  - Uses Google Gemini API for content analysis
+- **Content Analysis**:
+  - Advanced readability-inspired content extraction
+  - Structured metadata collection (JSON-LD, OpenGraph, etc.)
+  - Semantic content understanding
+
+- **AI Integration**:
+  - Uses Google Gemini API for content analysis and summarization
+  - Two-step AI processing: content categorization and page summarization
   - Requires a valid API key from Google AI Studio
 
 ## Future Enhancements
@@ -72,6 +84,7 @@ ai-bookmark-organizer/
 - Ability to reorganize existing bookmarks
 - Multi-browser support (Firefox, Edge)
 - Offline AI fallback for when API is unavailable
+- Tag-based organization alongside folder-based organization
 
 ## Privacy
 

@@ -2,16 +2,20 @@
 let currentPageData = {
   title: '',
   url: '',
-  content: ''
+  content: '',
+  summary: '',
+  metadata: {}
 };
 
 // Elements from the DOM
 const elements = {
   pageTitle: document.getElementById('pageTitle'),
   pageUrl: document.getElementById('pageUrl'),
+  aboutInput: document.getElementById('aboutInput'),
   folderSelect: document.getElementById('folderSelect'),
   suggestedFolder: document.getElementById('suggestedFolder'),
   notesInput: document.getElementById('notesInput'),
+  pageSummary: document.getElementById('pageSummary'),
   saveBtn: document.getElementById('saveBtn'),
   cancelBtn: document.getElementById('cancelBtn'),
   refreshFolders: document.getElementById('refreshFolders'),
@@ -41,9 +45,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     chrome.tabs.sendMessage(currentTab.id, { action: "getPageContent" }, async (response) => {
       if (response && response.content) {
+        // Store content and metadata
         currentPageData.content = response.content;
+        currentPageData.metadata = response.structuredData || {};
         
-        // Get AI suggestion
+        // Use the initial summary from content script while we generate a better one
+        const initialSummary = response.summary || "Analyzing page content...";
+        elements.pageSummary.textContent = initialSummary;
+        
+        // Generate a better summary using Gemini
+        try {
+          const summaryResponse = await chrome.runtime.sendMessage({
+            action: "generateSummary",
+            content: currentPageData.content,
+            metadata: currentPageData.metadata,
+            fallbackSummary: initialSummary
+          });
+          
+          if (summaryResponse.summary) {
+            currentPageData.summary = summaryResponse.summary;
+            elements.pageSummary.textContent = summaryResponse.summary;
+          } else if (summaryResponse.fallbackSummary) {
+            currentPageData.summary = summaryResponse.fallbackSummary;
+          }
+        } catch (error) {
+          console.error("Failed to generate summary:", error);
+          // Keep using the initial summary if we can't generate a better one
+        }
+        
+        // Get AI suggestion for folder
         await getAISuggestion();
       } else {
         showError("Could not extract page content");
@@ -57,7 +87,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   elements.saveBtn.addEventListener('click', saveBookmark);
   elements.cancelBtn.addEventListener('click', () => window.close());
   elements.refreshFolders.addEventListener('click', loadBookmarkFolders);
+  elements.aboutInput.addEventListener('input', debounce(refreshSuggestion, 500));
 });
+
+// Debounce function to prevent excessive API calls
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
+  };
+}
+
+// Refresh the AI suggestion when user inputs what the article is about
+async function refreshSuggestion() {
+  const userDescription = elements.aboutInput.value.trim();
+  if (userDescription) {
+    elements.suggestedFolder.textContent = "Updating...";
+    await getAISuggestion();
+  }
+}
 
 // Load all bookmark folders
 async function loadBookmarkFolders() {
@@ -130,12 +180,38 @@ async function getAISuggestion() {
       return;
     }
     
+    // Get user's description about the article (if provided)
+    const userDescription = elements.aboutInput.value.trim();
+    const userNotes = elements.notesInput.value.trim();
+    
+    // Get existing folders for context
+    const existingFolders = Array.from(elements.folderSelect.options)
+      .filter(option => option.value !== 'new' && option.value !== '')
+      .map(option => option.textContent)
+      .join(', ');
+    
     // Prepare content for Gemini
-    const prompt = `Classify this webpage into one short folder name (e.g., Finance, Health, Recipes, AI Learning, Travel Blogs). Respond with ONLY the folder name, nothing else.
+    const prompt = `Based on the webpage information below, suggest the most appropriate bookmark folder. 
 
 Title: ${currentPageData.title}
 URL: ${currentPageData.url}
-Content: ${currentPageData.content.substring(0, 500)}...`;
+${userDescription ? `Description provided by user: ${userDescription}` : ''}
+${userNotes ? `Note provided by user: ${userNotes}` : ''}
+${currentPageData.summary ? `50 word summary of page content: ${currentPageData.summary}` : ''}
+${currentPageData.metadata.keywords ? `Keywords: ${currentPageData.metadata.keywords}` : ''}
+
+Content excerpt:
+${currentPageData.content.substring(0, 500)}...
+
+Existing bookmark folders: ${existingFolders || "None"}
+
+First decide if one of the existing folders is appropriate or if a new folder should be created.
+Then respond in this exact format:
+USE_EXISTING: [folder name] 
+or 
+CREATE_NEW: [new folder name]
+
+The folder name should be short (1-3 words) and descriptive.`;
 
     // Send request to background script
     const response = await chrome.runtime.sendMessage({
@@ -147,24 +223,44 @@ Content: ${currentPageData.content.substring(0, 500)}...`;
       throw new Error(response.error);
     }
     
-    // Use the suggestion
-    const suggestedFolder = response.suggestion.trim();
-    elements.suggestedFolder.textContent = suggestedFolder;
+    // Process the suggestion
+    const suggestion = response.suggestion.trim();
     
-    // Find if the suggested folder exists
-    const folderExists = Array.from(elements.folderSelect.options).some(
-      option => option.textContent.endsWith(suggestedFolder)
-    );
+    // Parse the response format
+    let folderName;
+    let useExisting = false;
     
-    if (folderExists) {
-      // Select the existing folder
+    if (suggestion.startsWith("USE_EXISTING:")) {
+      useExisting = true;
+      folderName = suggestion.substring("USE_EXISTING:".length).trim();
+    } else if (suggestion.startsWith("CREATE_NEW:")) {
+      useExisting = false;
+      folderName = suggestion.substring("CREATE_NEW:".length).trim();
+    } else {
+      // Fallback if the format is not followed
+      folderName = suggestion;
+    }
+    
+    elements.suggestedFolder.textContent = folderName;
+    
+    if (useExisting) {
+      // Try to find and select the existing folder
+      let found = false;
       Array.from(elements.folderSelect.options).forEach(option => {
-        if (option.textContent.endsWith(suggestedFolder)) {
+        // Check if option text contains or ends with the folder name
+        if (option.textContent.includes(folderName) || 
+            option.textContent.endsWith(folderName)) {
           elements.folderSelect.value = option.value;
+          found = true;
         }
       });
+      
+      // If not found, fall back to creating a new folder
+      if (!found) {
+        elements.folderSelect.value = 'new';
+      }
     } else {
-      // Prepare to create a new folder
+      // Set to create a new folder
       elements.folderSelect.value = 'new';
     }
     
@@ -190,6 +286,14 @@ async function saveBookmark() {
     let bookmarkTitle = currentPageData.title;
     if (notes) {
       bookmarkTitle += ` - ${notes}`;
+    }
+    
+    // Add the page summary as a note if available and user didn't add notes
+    if (!notes && currentPageData.summary) {
+      bookmarkTitle += ` - ${currentPageData.summary.substring(0, 100)}`;
+      if (currentPageData.summary.length > 100) {
+        bookmarkTitle += '...';
+      }
     }
     
     // Handle creating new folder if needed
