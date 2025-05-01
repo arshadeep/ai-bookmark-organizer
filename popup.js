@@ -23,7 +23,7 @@ const elements = {
   patternInfoModal: document.getElementById('patternInfoModal'),
   closePatternInfo: document.getElementById('closePatternInfo'),
   notesInput: document.getElementById('notesInput'),
-  pageSummary: document.getElementById('pageSummary'),
+  pageSummary: document.getElementById('pageSummary'), // Still reference it but won't display to user
   saveBtn: document.getElementById('saveBtn'),
   cancelBtn: document.getElementById('cancelBtn'),
   refreshFolders: document.getElementById('refreshFolders'),
@@ -57,11 +57,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentPageData.content = response.content;
         currentPageData.metadata = response.structuredData || {};
         
-        // Use the initial summary from content script while we generate a better one
+        // Still generate the summary for internal use but don't display it
         const initialSummary = response.summary || "Analyzing page content...";
-        elements.pageSummary.textContent = initialSummary;
+        elements.pageSummary.textContent = initialSummary; // Update hidden element
+        currentPageData.summary = initialSummary;
         
-        // Generate a better summary using Gemini
+        // Generate a better summary using Gemini (for internal use)
         try {
           const summaryResponse = await chrome.runtime.sendMessage({
             action: "generateSummary",
@@ -72,7 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           
           if (summaryResponse.summary) {
             currentPageData.summary = summaryResponse.summary;
-            elements.pageSummary.textContent = summaryResponse.summary;
+            elements.pageSummary.textContent = summaryResponse.summary; // Update hidden element
           } else if (summaryResponse.fallbackSummary) {
             currentPageData.summary = summaryResponse.fallbackSummary;
           }
@@ -383,7 +384,7 @@ async function saveBookmark() {
       bookmarkTitle += ` - ${notes}`;
     }
     
-    // Add the page summary as a note if available and user didn't add notes
+    // We'll still use the summary internally, but as a note for the bookmark if user didn't add notes
     if (!notes && currentPageData.summary) {
       bookmarkTitle += ` - ${currentPageData.summary.substring(0, 100)}`;
       if (currentPageData.summary.length > 100) {

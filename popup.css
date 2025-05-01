@@ -64,7 +64,7 @@ h1 {
   100% { transform: rotate(360deg); }
 }
 
-.about-section, .folder-section, .notes-section, .page-summary {
+.about-section, .folder-section, .notes-section {
   margin-bottom: 15px;
 }
 
@@ -176,21 +176,20 @@ textarea {
   box-sizing: border-box;
 }
 
+/* Hidden but kept for functionality */
+.page-summary {
+  display: none;
+}
+
 .summary-text {
-  padding: 8px;
-  background-color: #f9f9f9;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  font-size: 13px;
-  max-height: 80px;
-  overflow-y: auto;
-  margin-top: 5px;
+  display: none;
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  margin-top: 20px; /* Add more spacing now that summary is hidden */
 }
 
 button {
