@@ -420,30 +420,55 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
       throw new Error(response.error);
     }
     
-    // Process the suggestion - FIX IS HERE
+    // Process the suggestion - FIXED VERSION
     const suggestion = response.suggestion.trim();
     
-    // Parse the response format - UPDATED CODE
-    let folderName;
+    // Parse the response format - look for the pattern anywhere in the response
+    let folderName = '';
     let useExisting = false;
     
-    // Split the response by newlines and process only the first line
-    const lines = suggestion.split('\n');
-    const firstLine = lines[0].trim();
+    // Search for USE_EXISTING or CREATE_NEW pattern in the entire response
+    const useExistingMatch = suggestion.match(/USE_EXISTING:\s*([^\n]+)/i);
+    const createNewMatch = suggestion.match(/CREATE_NEW:\s*([^\n]+)/i);
     
-    if (firstLine.startsWith("USE_EXISTING:")) {
+    if (useExistingMatch) {
       useExisting = true;
-      folderName = firstLine.substring("USE_EXISTING:".length).trim();
-    } else if (firstLine.startsWith("CREATE_NEW:")) {
+      folderName = useExistingMatch[1].trim();
+    } else if (createNewMatch) {
       useExisting = false;
-      folderName = firstLine.substring("CREATE_NEW:".length).trim();
+      folderName = createNewMatch[1].trim();
     } else {
-      // Fallback if the format is not followed
-      folderName = firstLine;
+      // Fallback: try to extract a folder name from the response
+      // Look for text in quotes or after a colon
+      const quotedMatch = suggestion.match(/["']([^"']+)["']/);
+      const colonMatch = suggestion.match(/:\s*([^\n]+)/);
+      
+      if (quotedMatch) {
+        folderName = quotedMatch[1].trim();
+      } else if (colonMatch) {
+        folderName = colonMatch[1].trim();
+      } else {
+        // Last resort: use first few words of the response
+        folderName = suggestion.split(/[.!?\n]/)[0].trim();
+        if (folderName.length > 50) {
+          folderName = folderName.substring(0, 50) + '...';
+        }
+      }
     }
     
     // Remove any quotes around the folder name
     folderName = folderName.replace(/^["']|["']$/g, '');
+    
+    // Ensure the folder name is not too long
+    if (folderName.length > 30) {
+      // Try to intelligently truncate by finding a good break point
+      const words = folderName.split(/\s+/);
+      if (words.length > 3) {
+        folderName = words.slice(0, 3).join(' ');
+      } else {
+        folderName = folderName.substring(0, 30) + '...';
+      }
+    }
     
     // Update the UI with folder name in input field
     elements.suggestedFolder.value = folderName;
