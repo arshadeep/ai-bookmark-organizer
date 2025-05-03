@@ -394,27 +394,32 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
       throw new Error(response.error);
     }
     
-    // Process the suggestion
+    // Process the suggestion - FIX IS HERE
     const suggestion = response.suggestion.trim();
     
-    // Parse the response format
+    // Parse the response format - UPDATED CODE
     let folderName;
     let useExisting = false;
     
-    if (suggestion.startsWith("USE_EXISTING:")) {
+    // Split the response by newlines and process only the first line
+    const lines = suggestion.split('\n');
+    const firstLine = lines[0].trim();
+    
+    if (firstLine.startsWith("USE_EXISTING:")) {
       useExisting = true;
-      folderName = suggestion.substring("USE_EXISTING:".length).trim();
-    } else if (suggestion.startsWith("CREATE_NEW:")) {
+      folderName = firstLine.substring("USE_EXISTING:".length).trim();
+    } else if (firstLine.startsWith("CREATE_NEW:")) {
       useExisting = false;
-      folderName = suggestion.substring("CREATE_NEW:".length).trim();
+      folderName = firstLine.substring("CREATE_NEW:".length).trim();
     } else {
       // Fallback if the format is not followed
-      folderName = suggestion;
+      folderName = firstLine;
     }
     
-    // Clean up the folder name - make sure it doesn't have the "Based on..." part
-    folderName = folderName.replace(/\s*\(based on.*\)/i, '').trim();
-    folderName = folderName.replace(/\s*\(.*pattern.*\)/i, '').trim();
+    // Remove any quotes around the folder name
+    folderName = folderName.replace(/^["']|["']$/g, '');
+    
+    // Update the UI with just the folder name
     elements.suggestedFolder.textContent = folderName;
     
     if (useExisting) {
@@ -518,11 +523,8 @@ async function saveBookmark(elements) {
         // Fixed how folder name is stored - use clean folder name without metadata
         let folderNameToStore;
         if (selectedFolder === 'new') {
-          // Extract just the folder name without any "Based on..." text
-          folderNameToStore = elements.suggestedFolder.textContent
-            .replace(/\s*\(based on.*\)/i, '')
-            .replace(/\s*\(.*pattern.*\)/i, '')
-            .trim();
+          // Use the already cleaned folder name from suggestedFolder
+          folderNameToStore = elements.suggestedFolder.textContent;
         } else {
           folderNameToStore = Array.from(elements.folderSelect.options)
             .find(opt => opt.value === selectedFolder)?.textContent || '';
@@ -551,13 +553,8 @@ async function saveBookmark(elements) {
     
     // Handle creating new folder if needed
     if (selectedFolder === 'new') {
-      // Clean up the folder name before using it
-      // Remove any metadata text like "Based on your bookmarking patterns"
-      const rawFolderName = elements.suggestedFolder.textContent;
-      const newFolderName = rawFolderName
-        .replace(/\s*\(based on.*\)/i, '')
-        .replace(/\s*\(.*pattern.*\)/i, '')
-        .trim();
+      // Use the already cleaned folder name from suggestedFolder
+      const newFolderName = elements.suggestedFolder.textContent;
       
       // Create new folder in the Bookmarks Bar
       const newFolder = await chrome.bookmarks.create({
