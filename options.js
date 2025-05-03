@@ -50,9 +50,13 @@ refreshPatternsButton.addEventListener('click', updatePatternsList);
 
 // Tab navigation setup
 function setupTabNavigation() {
+  console.log('Setting up tab navigation. Found tabs:', tabButtons.length);
+  console.log('Found content areas:', tabContents.length);
+  
   tabButtons.forEach(button => {
     button.addEventListener('click', () => {
       const tabId = button.getAttribute('data-tab');
+      console.log('Tab clicked:', tabId);
       
       // Hide all tab contents
       tabContents.forEach(content => {
@@ -65,7 +69,15 @@ function setupTabNavigation() {
       });
       
       // Show the selected tab content
-      document.getElementById(tabId).classList.add('active');
+      const selectedTab = document.getElementById(tabId);
+      console.log('Looking for tab with id:', tabId);
+      console.log('Found element:', selectedTab);
+      
+      if (selectedTab) {
+        selectedTab.classList.add('active');
+      } else {
+        console.error('Could not find tab with id:', tabId);
+      }
       
       // Add active class to the clicked button
       button.classList.add('active');

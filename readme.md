@@ -5,6 +5,7 @@ A Chrome extension that automatically categorizes your bookmarks using Google's 
 ## Features
 
 - **AI-Powered Categorization**: Analyzes page content to suggest the most appropriate folder
+-- **Bulk Bookmark Organization**: Organize all your unsorted bookmarks at once with AI assistance
 - **Smart Pattern Recognition**: Learns from your bookmarking habits to suggest folders that match your personal style
 - **User Context Integration**: Add your own description of what the article is about for better categorization
 - **Smart Content Analysis**: Advanced page scraping to extract meaningful content
