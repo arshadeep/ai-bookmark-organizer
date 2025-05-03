@@ -117,6 +117,104 @@ function getFullFolderPath(node) {
   return pathParts.join(' > ');
 }
 
+// Function to fetch and analyze page content
+async function fetchPageContent(url) {
+  try {
+    // Create a tab in the background
+    const tab = await chrome.tabs.create({ 
+      url: url, 
+      active: false,
+      pinned: true  // Pin the tab to make it less noticeable
+    });
+    
+    // Wait for the tab to finish loading
+    await new Promise((resolve) => {
+      const listener = (tabId, changeInfo) => {
+        if (tabId === tab.id && changeInfo.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }, 10000);
+    });
+    
+    // Execute content extraction script
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: extractPageContent
+    });
+    
+    // Close the tab
+    await chrome.tabs.remove(tab.id);
+    
+    return result.result || {};
+  } catch (error) {
+    console.error('Error fetching page content:', error);
+    return {};
+  }
+}
+
+// Function to extract content from the page
+function extractPageContent() {
+  const content = {
+    title: document.title || '',
+    description: '',
+    keywords: [],
+    headings: [],
+    text: '',
+    metadata: {}
+  };
+  
+  // Extract meta description
+  const metaDescription = document.querySelector('meta[name="description"]');
+  content.description = metaDescription ? metaDescription.content : '';
+  
+  // Extract keywords
+  const metaKeywords = document.querySelector('meta[name="keywords"]');
+  if (metaKeywords) {
+    content.keywords = metaKeywords.content.split(',').map(k => k.trim());
+  }
+  
+  // Extract OpenGraph metadata
+  const ogTitle = document.querySelector('meta[property="og:title"]');
+  const ogDescription = document.querySelector('meta[property="og:description"]');
+  const ogType = document.querySelector('meta[property="og:type"]');
+  
+  if (ogTitle) content.metadata.ogTitle = ogTitle.content;
+  if (ogDescription) content.metadata.ogDescription = ogDescription.content;
+  if (ogType) content.metadata.ogType = ogType.content;
+  
+  // Extract headings
+  const headings = document.querySelectorAll('h1, h2, h3');
+  content.headings = Array.from(headings).slice(0, 10).map(h => h.textContent.trim());
+  
+  // Extract main content
+  const mainContent = document.querySelector('main, article, .content, .main-content, #content') || document.body;
+  
+  // Clone to avoid modifying the actual page
+  const contentClone = mainContent.cloneNode(true);
+  
+  // Remove unwanted elements
+  const unwantedSelectors = ['script', 'style', 'noscript', 'iframe', 'nav', 'footer', 'header', '.sidebar', '.menu', '.ad', '.advertisement'];
+  unwantedSelectors.forEach(selector => {
+    contentClone.querySelectorAll(selector).forEach(el => el.remove());
+  });
+  
+  // Extract text content
+  content.text = contentClone.textContent
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 2000); // Limit to first 2000 characters
+  
+  return content;
+}
+
 async function startAnalysis() {
   if (bookmarkData.unsorted.length === 0) {
     showMessage('No unsorted bookmarks to organize!', 'success');
@@ -161,7 +259,7 @@ async function analyzeBookmarks(unsortedBookmarks) {
   updateProgress(processed, unsortedBookmarks.length);
   
   // Batch process bookmarks to avoid API rate limits
-  const batchSize = 5;
+  const batchSize = 3; // Reduced batch size for content scraping
   
   for (let i = 0; i < unsortedBookmarks.length; i += batchSize) {
     const batch = unsortedBookmarks.slice(i, i + batchSize);
@@ -169,7 +267,13 @@ async function analyzeBookmarks(unsortedBookmarks) {
     // Process each bookmark in the batch
     await Promise.all(batch.map(async (bookmark) => {
       try {
-        const suggestedFolder = await getSuggestedFolder(bookmark);
+        statusMessage.textContent = `Analyzing: ${bookmark.title}...`;
+        
+        // Fetch page content for better categorization
+        const pageContent = await fetchPageContent(bookmark.url);
+        
+        // Get suggested folder with page content
+        const suggestedFolder = await getSuggestedFolder(bookmark, pageContent);
         
         // Add to proposed organization
         if (!proposedOrganization[suggestedFolder]) {
@@ -184,14 +288,16 @@ async function analyzeBookmarks(unsortedBookmarks) {
       } catch (error) {
         console.error(`Error analyzing bookmark "${bookmark.title}":`, error);
         
-        // Add to 'Uncategorized' if analysis fails
-        if (!proposedOrganization['Uncategorized']) {
-          proposedOrganization['Uncategorized'] = {
+        // Use generic fallback categorization
+        const fallbackFolder = getGenericFallbackCategory(bookmark);
+        
+        if (!proposedOrganization[fallbackFolder]) {
+          proposedOrganization[fallbackFolder] = {
             bookmarks: [],
-            isNew: !isFolderExisting('Uncategorized')
+            isNew: !isFolderExisting(fallbackFolder)
           };
         }
-        proposedOrganization['Uncategorized'].bookmarks.push(bookmark);
+        proposedOrganization[fallbackFolder].bookmarks.push(bookmark);
       }
       
       processed++;
@@ -200,15 +306,15 @@ async function analyzeBookmarks(unsortedBookmarks) {
     
     // Small delay between batches to avoid rate limiting
     if (i + batchSize < unsortedBookmarks.length) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
     }
   }
   
   return proposedOrganization;
 }
 
-async function getSuggestedFolder(bookmark) {
-  // First, try to extract context from URL and title
+async function getSuggestedFolder(bookmark, pageContent) {
+  // Extract context from URL and title
   const context = extractContextFromUrlAndTitle(bookmark.url, bookmark.title);
   
   // Get existing folder names for context
@@ -216,8 +322,8 @@ async function getSuggestedFolder(bookmark) {
     .map(folder => folder.title)
     .join(', ');
   
-  // Prepare the prompt
-  const prompt = `Analyze this bookmark and suggest the most appropriate folder name:
+  // Enhanced prompt with page content
+  const prompt = `Analyze this bookmark and suggest the most appropriate folder name.
 
 Title: ${bookmark.title}
 URL: ${bookmark.url}
@@ -225,12 +331,28 @@ Domain: ${context.domain || 'Unknown'}
 URL path terms: ${context.pathParts ? context.pathParts.join(', ') : 'None'}
 Key terms from title: ${context.titleTerms ? context.titleTerms.join(', ') : 'None'}
 
+Page Content Analysis:
+- Description: ${pageContent.description || 'Not available'}
+- Keywords: ${pageContent.keywords?.join(', ') || 'None'}
+- Headings: ${pageContent.headings?.slice(0, 5).join(', ') || 'None'}
+- Content preview: ${pageContent.text?.slice(0, 300) || 'Not available'}
+- Page type: ${pageContent.metadata?.ogType || 'Unknown'}
+
 Existing folders: ${existingFolderNames}
 
-Suggest a single folder name that would best categorize this bookmark. If an existing folder is appropriate, use that exact name. Otherwise, suggest a new folder name. The folder name should be:
-- 1-3 words maximum
-- Clear and descriptive
-- Consistent with existing folder naming patterns if similar folders exist
+CATEGORIZATION PRINCIPLES:
+1. Identify if this is about a specific brand, product, or instance that belongs to a broader category
+2. Look for relationships between specific items and general categories
+3. If content is about a specific item (brand, model, technology), categorize it under the general product category
+4. Use existing folder names if they represent appropriate broader categories
+5. Create new folders only for truly distinct categories not represented in existing folders
+
+Think about hierarchical relationships:
+- Are we looking at a specific brand that belongs to a product category?
+- Is this a specific technology that belongs to a broader field?
+- Is this a specific type of content that belongs to a general category?
+
+Based on the page content and context, determine the most logical broader category.
 
 Respond with ONLY the folder name, nothing else.`;
 
@@ -246,28 +368,14 @@ Respond with ONLY the folder name, nothing else.`;
     }
     
     const folderName = response.suggestion.trim();
-    return folderName || 'Uncategorized';
+    
+    return folderName || 'General';
     
   } catch (error) {
     console.error('Error getting folder suggestion:', error);
     
-    // Fallback: use domain-based categorization
-    if (context.domain) {
-      // Try to match with common domain patterns
-      if (context.domain.includes('github.com') || context.domain.includes('gitlab.com')) {
-        return 'Development';
-      } else if (context.domain.includes('stackoverflow.com')) {
-        return 'Programming';
-      } else if (context.domain.includes('youtube.com') || context.domain.includes('vimeo.com')) {
-        return 'Videos';
-      } else if (context.domain.includes('medium.com') || context.domain.includes('dev.to')) {
-        return 'Articles';
-      } else if (context.domain.includes('news') || context.domain.includes('nytimes.com')) {
-        return 'News';
-      }
-    }
-    
-    return 'Uncategorized';
+    // Use enhanced fallback with page content
+    return getEnhancedFallbackCategory(bookmark, pageContent);
   }
 }
 
@@ -293,12 +401,163 @@ function extractContextFromUrlAndTitle(url, title) {
       .replace(/\|.*$/, '')    // Remove site names after pipe
       .split(/\s+/)
       .filter(word => 
-        word.length > 3 && 
+        word.length > 2 && 
         !['http', 'https', 'www', 'com', 'org', 'the', 'and', 'for'].includes(word.toLowerCase())
       );
   }
   
   return context;
+}
+
+// Enhanced fallback categorization with page content
+function getEnhancedFallbackCategory(bookmark, pageContent) {
+  const url = bookmark.url.toLowerCase();
+  const title = bookmark.title.toLowerCase();
+  const description = (pageContent.description || '').toLowerCase();
+  const contentText = (pageContent.text || '').toLowerCase();
+  const keywords = (pageContent.keywords || []).join(' ').toLowerCase();
+  
+  // Look for patterns in all available content
+  const allContent = `${title} ${description} ${keywords} ${contentText}`;
+  
+  // Recipe/cooking content
+  if (allContent.includes('recipe') || allContent.includes('cooking') || 
+      allContent.includes('ingredients') || allContent.includes('preparation')) {
+    return 'Recipes';
+  }
+  
+  // Development/programming
+  if (allContent.includes('code') || allContent.includes('programming') || 
+      allContent.includes('developer') || allContent.includes('software') ||
+      url.includes('github.') || url.includes('stackoverflow.')) {
+    return 'Development';
+  }
+  
+  // News/articles
+  if (allContent.includes('news') || allContent.includes('article') ||
+      pageContent.metadata?.ogType === 'article' ||
+      url.includes('/article') || url.includes('/story/')) {
+    return 'News';
+  }
+  
+  // Video content
+  if (url.includes('youtube.') || url.includes('vimeo.') ||
+      allContent.includes('video') || allContent.includes('watch')) {
+    return 'Videos';
+  }
+  
+  // Shopping/commerce
+  if (allContent.includes('shop') || allContent.includes('buy') ||
+      allContent.includes('price') || allContent.includes('cart') ||
+      allContent.includes('product')) {
+    return 'Shopping';
+  }
+  
+  // Educational content
+  if (allContent.includes('learn') || allContent.includes('tutorial') ||
+      allContent.includes('course') || allContent.includes('education')) {
+    return 'Education';
+  }
+  
+  // Documentation
+  if (url.includes('/docs') || url.includes('/documentation') ||
+      allContent.includes('documentation') || allContent.includes('guide') ||
+      allContent.includes('reference')) {
+    return 'Documentation';
+  }
+  
+  // Blog content
+  if (url.includes('/blog') || url.includes('blog.') ||
+      allContent.includes('blog') || pageContent.metadata?.ogType === 'blog') {
+    return 'Blogs';
+  }
+  
+  // Research/academic
+  if (allContent.includes('research') || allContent.includes('study') ||
+      allContent.includes('paper') || allContent.includes('academic')) {
+    return 'Research';
+  }
+  
+  // Tools/utilities
+  if (allContent.includes('tool') || allContent.includes('utility') ||
+      allContent.includes('calculator') || allContent.includes('converter')) {
+    return 'Tools';
+  }
+  
+  // Default fallback
+  return getGenericFallbackCategory(bookmark);
+}
+
+// Generic fallback categorization based on patterns
+function getGenericFallbackCategory(bookmark) {
+  const url = bookmark.url.toLowerCase();
+  const title = bookmark.title.toLowerCase();
+  
+  // Look for common web content patterns
+  if (url.includes('recipe') || title.includes('recipe') || 
+      url.includes('cooking') || title.includes('cooking')) {
+    return 'Recipes';
+  }
+  
+  if (url.includes('github.') || url.includes('gitlab.') || 
+      url.includes('stackoverflow.') || title.includes('code') ||
+      title.includes('programming')) {
+    return 'Development';
+  }
+  
+  if (url.includes('news') || title.includes('news') ||
+      url.includes('.com/article') || url.includes('/story/')) {
+    return 'News';
+  }
+  
+  if (url.includes('youtube.') || url.includes('vimeo.') ||
+      url.includes('video') || title.includes('video')) {
+    return 'Videos';
+  }
+  
+  if (url.includes('shop') || url.includes('store') ||
+      url.includes('buy') || title.includes('price') ||
+      title.includes('buy')) {
+    return 'Shopping';
+  }
+  
+  if (url.includes('/blog') || url.includes('blog.') ||
+      title.includes('blog')) {
+    return 'Blogs';
+  }
+  
+  if (url.includes('/docs') || url.includes('/documentation') ||
+      title.includes('documentation') || title.includes('guide')) {
+    return 'Documentation';
+  }
+  
+  // Look for domain-based patterns
+  const domain = getDomainFromUrl(url);
+  if (domain) {
+    const domainParts = domain.split('.');
+    if (domainParts.length > 1) {
+      const domainName = domainParts[0];
+      if (domainName.length > 3) {
+        return capitalize(domainName);
+      }
+    }
+  }
+  
+  // Default category
+  return 'General';
+}
+
+function getDomainFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace('www.', '');
+  } catch (e) {
+    return null;
+  }
+}
+
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function isFolderExisting(folderName) {
