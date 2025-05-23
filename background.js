@@ -82,7 +82,7 @@ async function getGeminiSuggestion(prompt) {
         ],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 50, // Increased to handle the new format
+          maxOutputTokens: 100, // Increased to handle the new format
           topP: 0.95,
           topK: 40
         }

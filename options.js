@@ -9,6 +9,7 @@ const patternWeightSlider = document.getElementById('patternWeight');
 const patternWeightValue = document.getElementById('patternWeightValue');
 const considerHierarchyToggle = document.getElementById('considerHierarchy');
 const autoUpdatePatternsToggle = document.getElementById('autoUpdatePatterns');
+const autoSaveBookmarksToggle = document.getElementById('autoSaveBookmarks');  // ← NEW
 const resetPatternsButton = document.getElementById('resetPatterns');
 const savePatternButton = document.getElementById('savePatternBtn');
 const patternStatusDiv = document.getElementById('patternStatus');
@@ -26,6 +27,7 @@ const defaultPatternSettings = {
   enablePatterns: true,
   patternWeight: 50,
   considerHierarchy: true,
+  autoSaveBookmarks: false,  // ← NEW
   autoUpdatePatterns: true
 };
 
@@ -110,6 +112,7 @@ async function loadPatternSettings() {
     patternWeightValue.textContent = settings.patternWeight + '%';
     considerHierarchyToggle.checked = settings.considerHierarchy;
     autoUpdatePatternsToggle.checked = settings.autoUpdatePatterns;
+    autoSaveBookmarksToggle.checked = settings.autoSaveBookmarks;  // ← RESTORED
     
   } catch (error) {
     showPatternStatus('Error loading pattern settings: ' + error.message, false);
@@ -145,7 +148,8 @@ async function savePatternSettings() {
       enablePatterns: enablePatternsToggle.checked,
       patternWeight: parseInt(patternWeightSlider.value),
       considerHierarchy: considerHierarchyToggle.checked,
-      autoUpdatePatterns: autoUpdatePatternsToggle.checked
+      autoUpdatePatterns: autoUpdatePatternsToggle.checked,
+      autoSaveBookmarks:  autoSaveBookmarksToggle.checked    // ← NEW
     };
     
     await chrome.storage.local.set({ 'patternSettings': settings });

@@ -83,6 +83,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ← NEW: auto-save flag from settings
+const defaultPatternSettings = { autoSaveBookmarks: false };
+let autoSaveEnabled = false;
+
+ // Load the user’s auto-save preference up front
+chrome.storage.local.get(
+   { patternSettings: defaultPatternSettings },
+   ({ patternSettings }) => {
+     autoSaveEnabled = patternSettings.autoSaveBookmarks;
+  }
+);
 // Main initialization function
 async function initializePopup(elements) {
   try {
@@ -167,6 +178,8 @@ async function initializePopup(elements) {
     showError("Error initializing popup: " + error.message, elements);
   }
 }
+
+
 
 // Handle case where content script fails to respond
 function handleContentScriptFailure(elements) {
@@ -270,6 +283,7 @@ function extractFolders(bookmarkItems, path = '', result = []) {
 // Get folder suggestion from Gemini API
 async function getAISuggestion(elements) {
   updateStatus("Getting AI suggestion...", false, elements);
+
   
   try {
     // Get API key from storage
@@ -495,8 +509,18 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
       elements.folderSelect.value = 'new';
     }
     
-    updateStatus("Ready to save bookmark", true, elements);
-    elements.saveBtn.disabled = false;
+    //updateStatus("Ready to save bookmark", true, elements);
+    //elements.saveBtn.disabled = false;
+    if (autoSaveEnabled) {
+            // Automatically save without user click
+            await saveBookmark(elements);
+          } 
+    else 
+          {
+            // Fall back to manual mode
+           updateStatus("Ready to save bookmark", true, elements);
+           elements.saveBtn.disabled = false;
+          }
     
   } catch (error) {
     // If we can't get an AI suggestion, show clear guidance to user
