@@ -3,49 +3,53 @@
 <head>
   <title>Bookmark.AI</title>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <h1>Bookmark.AI</h1>
     
-    <div class="bookmark-info">
-      <div class="page-title" id="pageTitle">Loading page title...</div>
-      <div class="page-url" id="pageUrl">Loading URL...</div>
-    </div>
-    
-    <div class="status-message" id="statusMessage">
-      <div class="loader" id="loader"></div>
-      <span id="statusText">Analyzing page content...</span>
-    </div>
-    
-    <div class="folder-section">
-      <label for="folderSelect">Folder:</label>
-      <div class="folder-select-container">
-        <select id="folderSelect" disabled>
-          <option value="">Loading folders...</option>
-        </select>
-        <button id="refreshFolders" title="Refresh folder list">↻</button>
+    <div class="content">
+      <div class="bookmark-info">
+        <h2 class="page-title" id="pageTitle">Loading page title...</h2>
+        <p class="page-url" id="pageUrl">Loading URL...</p>
       </div>
-      <div class="suggested-folder">
-        <label for="suggestedFolder">AI Suggestion:</label>
-        <input type="text" id="suggestedFolder" placeholder="Analyzing..." disabled>
+      
+      <div class="status-message" id="statusMessage">
+        <div class="loader" id="loader"></div>
+        <span id="statusText">Analyzing page content...</span>
       </div>
-    </div>
-    
-    <div class="notes-section">
-      <label for="notesInput">Notes (optional):</label>
-      <textarea id="notesInput" placeholder="Add notes about this bookmark..."></textarea>
-    </div>
-    
-    <!-- Page summary section is now hidden but we keep the element for internal use -->
-    <div class="page-summary" id="pageSummarySection" style="display: none;">
-      <div id="pageSummary" class="summary-text">Generating summary...</div>
+      
+      <div class="folder-section">
+        <label class="section-title" for="folderSelect">Folder</label>
+        <div class="folder-select-container">
+          <select id="folderSelect" disabled>
+            <option value="">Loading folders...</option>
+          </select>
+          <button id="refreshFolders" title="Refresh folder list" aria-label="Refresh folders">↻</button>
+        </div>
+        
+        <div class="suggested-folder">
+          <label class="section-title" for="suggestedFolder">AI Suggestion</label>
+          <input type="text" id="suggestedFolder" placeholder="Analyzing..." disabled>
+        </div>
+      </div>
+      
+      <div class="notes-section">
+        <label class="section-title" for="notesInput">Notes (Optional)</label>
+        <textarea id="notesInput" placeholder="Add notes about this bookmark..."></textarea>
+      </div>
+      
+      <!-- Hidden but kept for functionality -->
+      <div class="page-summary" id="pageSummarySection" style="display: none;">
+        <div id="pageSummary" class="summary-text">Generating summary...</div>
+      </div>
     </div>
     
     <div class="actions">
-      <button id="saveBtn" disabled>Save Bookmark</button>
       <button id="cancelBtn">Cancel</button>
+      <button id="saveBtn" disabled>Save Bookmark</button>
     </div>
   </div>
   

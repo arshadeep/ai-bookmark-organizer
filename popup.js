@@ -10,7 +10,15 @@ let currentPageData = {
 
 // Wait for DOM to be fully loaded before getting elements
 document.addEventListener('DOMContentLoaded', () => {
-  // Elements from the DOM - moved inside DOMContentLoaded
+  // Force fixed dimensions immediately to prevent movement
+  document.body.style.width = '380px';
+  document.body.style.minWidth = '380px';
+  document.body.style.maxWidth = '380px';
+  document.documentElement.style.width = '380px';
+  document.documentElement.style.minWidth = '380px';
+  document.documentElement.style.maxWidth = '380px';
+  
+  // Elements from the DOM
   const elements = {
     pageTitle: document.getElementById('pageTitle'),
     pageUrl: document.getElementById('pageUrl'),
@@ -26,6 +34,25 @@ document.addEventListener('DOMContentLoaded', () => {
     loader: document.getElementById('loader')
   };
 
+  // Pre-set fixed dimensions on all elements to prevent layout shifts
+  if (elements.statusMessage) {
+    elements.statusMessage.style.height = '44px';
+    elements.statusMessage.style.minHeight = '44px';
+    elements.statusMessage.style.maxHeight = '44px';
+  }
+  
+  if (elements.folderSelect) {
+    elements.folderSelect.style.height = '40px';
+    elements.folderSelect.style.minHeight = '40px';
+    elements.folderSelect.style.maxHeight = '40px';
+  }
+  
+  if (elements.suggestedFolder) {
+    elements.suggestedFolder.style.height = '40px';
+    elements.suggestedFolder.style.minHeight = '40px';
+    elements.suggestedFolder.style.maxHeight = '40px';
+  }
+
   // Initialize the popup
   initializePopup(elements);
 
@@ -36,10 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Listen for changes in the suggested folder input
   elements.suggestedFolder.addEventListener('input', () => {
-    // When user manually types in the suggestion field, update the folder select
     const userInput = elements.suggestedFolder.value.trim();
     if (userInput) {
-      // Check if the folder exists
       let foundMatch = false;
       Array.from(elements.folderSelect.options).forEach(option => {
         if (option.textContent.includes(userInput) || 
@@ -49,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
       
-      // If no match found, set to create new folder
       if (!foundMatch) {
         elements.folderSelect.value = 'new';
       }
@@ -57,11 +81,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ← NEW: auto-save flag from settings
+// Auto-save flag from settings
 const defaultPatternSettings = { autoSaveBookmarks: false };
 let autoSaveEnabled = false;
 
-// Load the user's auto-save preference up front
+// Load the user's auto-save preference
 chrome.storage.local.get(
   { patternSettings: defaultPatternSettings },
   ({ patternSettings }) => {
@@ -80,9 +104,9 @@ async function initializePopup(elements) {
     currentPageData.title = currentTab.title;
     currentPageData.url = currentTab.url;
     
-    // Display page info in the popup
-    elements.pageTitle.textContent = currentPageData.title;
-    elements.pageUrl.textContent = currentPageData.url;
+    // Display page info immediately to prevent layout shifts
+    safeUpdateText(elements.pageTitle, currentPageData.title);
+    safeUpdateText(elements.pageUrl, currentPageData.url);
     
     // Load bookmark folders
     await loadBookmarkFolders(elements);
@@ -90,7 +114,6 @@ async function initializePopup(elements) {
     // Get page content from the content script
     try {
       chrome.tabs.sendMessage(currentTab.id, { action: "getPageContent" }, async (response) => {
-        // Handle error if response is undefined (connection failure)
         if (chrome.runtime.lastError) {
           console.warn("Content script connection error:", chrome.runtime.lastError);
           handleContentScriptFailure(elements);
@@ -98,15 +121,12 @@ async function initializePopup(elements) {
         }
         
         if (response && response.content) {
-          // Store content and metadata
           currentPageData.content = response.content;
           currentPageData.metadata = response.structuredData || {};
           
-          // Use the initial summary from content script while we generate a better one
           const initialSummary = response.summary || "Analyzing page content...";
-          elements.pageSummary.textContent = initialSummary;
+          safeUpdateText(elements.pageSummary, initialSummary);
           
-          // Generate a better summary using Gemini
           try {
             const summaryResponse = await chrome.runtime.sendMessage({
               action: "generateSummary",
@@ -117,27 +137,22 @@ async function initializePopup(elements) {
             
             if (summaryResponse.summary) {
               currentPageData.summary = summaryResponse.summary;
-              elements.pageSummary.textContent = summaryResponse.summary;
+              safeUpdateText(elements.pageSummary, summaryResponse.summary);
             } else if (summaryResponse.fallbackSummary) {
               currentPageData.summary = summaryResponse.fallbackSummary;
               
-              // Store alternative context if available for use in folder suggestions
               if (summaryResponse.alternativeContext) {
                 currentPageData.alternativeContext = summaryResponse.alternativeContext;
               }
             }
           } catch (error) {
             console.error("Failed to generate summary:", error);
-            // Keep using the initial summary if we can't generate a better one
           }
           
-          // Get AI suggestion for folder
           await getAISuggestion(elements);
         } else {
-          // Handle case where content extraction failed
           console.warn("Could not extract page content");
           
-          // Still try to get a folder suggestion based on URL and title
           currentPageData.alternativeContext = extractContextFromUrlAndMetadata({
             title: currentPageData.title,
             url: currentPageData.url
@@ -154,17 +169,31 @@ async function initializePopup(elements) {
   }
 }
 
-// Handle case where content script fails to respond
+// Safe text update that preserves layout
+function safeUpdateText(element, text) {
+  if (!element || !text) return;
+  
+  // Use a more stable approach to prevent layout shifts
+  const maxLength = element === document.getElementById('pageTitle') ? 80 : 
+                   element === document.getElementById('pageUrl') ? 60 : 200;
+  
+  const truncatedText = text.length > maxLength ? 
+    text.substring(0, maxLength) + '...' : text;
+  
+  if (element.textContent !== truncatedText) {
+    element.textContent = truncatedText;
+  }
+}
+
+// Handle content script failure
 function handleContentScriptFailure(elements) {
   updateStatus("Analyzing page...", false, elements);
   
-  // Use URL-based context extraction as fallback
   currentPageData.alternativeContext = extractContextFromUrlAndMetadata({
     title: currentPageData.title,
     url: currentPageData.url
   });
   
-  // Try to get folder suggestion with limited information
   getAISuggestion(elements).catch(error => {
     console.error("Could not get AI suggestion:", error);
     elements.suggestedFolder.value = "";
@@ -175,41 +204,38 @@ function handleContentScriptFailure(elements) {
   });
 }
 
-// Load all bookmark folders
+// Load bookmark folders with stable updates
 async function loadBookmarkFolders(elements) {
-  elements.folderSelect.innerHTML = '<option value="">Loading folders...</option>';
+  // Don't change the select content until we have the data
+  const originalContent = elements.folderSelect.innerHTML;
   elements.folderSelect.disabled = true;
   
   try {
-    // Get all bookmarks
     const bookmarks = await chrome.bookmarks.getTree();
     const folders = extractFolders(bookmarks);
     
-    // Clear and populate dropdown
-    elements.folderSelect.innerHTML = '';
+    // Build the complete HTML first, then update in one operation
+    let optionsHtml = '';
     
     // Add default option for root
-    const rootOption = document.createElement('option');
-    rootOption.value = '1'; // Chrome's default Bookmarks Bar ID
-    rootOption.textContent = 'Bookmarks Bar';
-    elements.folderSelect.appendChild(rootOption);
+    optionsHtml += '<option value="1">Bookmarks Bar</option>';
     
     // Add all other folders
     folders.forEach(folder => {
-      const option = document.createElement('option');
-      option.value = folder.id;
-      option.textContent = folder.path;
-      elements.folderSelect.appendChild(option);
+      const escapedPath = folder.path.replace(/"/g, '&quot;');
+      optionsHtml += `<option value="${folder.id}">${escapedPath}</option>`;
     });
     
     // Add option to create new folder
-    const newFolderOption = document.createElement('option');
-    newFolderOption.value = 'new';
-    newFolderOption.textContent = '+ Create New Folder';
-    elements.folderSelect.appendChild(newFolderOption);
+    optionsHtml += '<option value="new">+ Create New Folder</option>';
     
+    // Update in one operation to prevent layout shifts
+    elements.folderSelect.innerHTML = optionsHtml;
     elements.folderSelect.disabled = false;
+    
   } catch (error) {
+    // Restore original content if there's an error
+    elements.folderSelect.innerHTML = originalContent;
     showError("Error loading bookmark folders: " + error.message, elements);
   }
 }
@@ -218,7 +244,6 @@ async function loadBookmarkFolders(elements) {
 function extractFolders(bookmarkItems, path = '', result = []) {
   for (const item of bookmarkItems) {
     if (item.children) {
-      // Skip the root nodes (they don't have titles)
       let currentPath = path;
       if (item.title) {
         currentPath = path ? `${path} > ${item.title}` : item.title;
@@ -230,13 +255,11 @@ function extractFolders(bookmarkItems, path = '', result = []) {
   return result;
 }
 
-// Get folder suggestion from Gemini API
-// Fixed folder selection logic in getAISuggestion function
+// Get AI suggestion with stable UI updates
 async function getAISuggestion(elements) {
   updateStatus("Getting AI suggestion...", false, elements);
   
   try {
-    // Get API key from storage
     const result = await chrome.storage.local.get('geminiApiKey');
     const apiKey = result.geminiApiKey;
     
@@ -244,13 +267,14 @@ async function getAISuggestion(elements) {
       elements.suggestedFolder.placeholder = "No API key set";
       elements.suggestedFolder.disabled = false;
       updateStatus("Please set Gemini API key in extension options", true, elements);
+      setStatusClass(elements.statusMessage, 'error');
       elements.saveBtn.disabled = true;
       return;
     }
     
     const userNotes = elements.notesInput.value.trim();
     
-    // First, check if there's a pattern match from user's existing bookmarks
+    // Get pattern recommendation
     let patternRecommendation = null;
     try {
       patternRecommendation = await chrome.runtime.sendMessage({
@@ -268,17 +292,15 @@ async function getAISuggestion(elements) {
       .map(option => option.textContent)
       .join(', ');
     
-    // Extract top categories from existing folder structure
     const topCategories = analyzeExistingFolders(elements.folderSelect.options);
     
-    // Check if we have content or summary to work with
+    // Check context availability
     let contextMissing = false;
     let alternativeContext = currentPageData.alternativeContext || {};
     
     if (!currentPageData.content || currentPageData.content.length < 100) {
       contextMissing = true;
       
-      // If we don't already have alternative context, extract it
       if (!alternativeContext || Object.keys(alternativeContext).length === 0) {
         alternativeContext = extractContextFromUrlAndMetadata({
           title: currentPageData.title,
@@ -288,7 +310,7 @@ async function getAISuggestion(elements) {
       }
     }
     
-    // Modify prompt based on available context
+    // Create prompt
     let prompt;
     
     if (contextMissing) {
@@ -322,7 +344,7 @@ CREATE_NEW: [new folder name]
 
 The folder name must be 1-3 words maximum. Do not include any explanations, reasoning, colons, dashes, or additional text. Just the format above.`;
     } else {
-      prompt = `Based on the webpage information below, suggest the most appropriate bookmark folder. The user has a specific way of organizing bookmarks.
+      prompt = `Based on the webpage information below, suggest the most appropriate bookmark folder.
 
 Title: ${currentPageData.title}
 URL: ${currentPageData.url}
@@ -334,13 +356,10 @@ Content excerpt:
 ${currentPageData.content ? currentPageData.content.substring(0, 500) + '...' : 'Not available'}
 
 Existing bookmark folders: ${existingFolders || "None"}
-
 Common categories in user's bookmark structure: ${topCategories}
 
 ${patternRecommendation && patternRecommendation.recommendation ? `IMPORTANT: Based on the user's bookmarking patterns, this content may belong in the folder: "${patternRecommendation.recommendation.path}"` : ''}
 
-First decide if one of the existing folders is appropriate or if a new folder should be created.
-${patternRecommendation && patternRecommendation.recommendation ? 'Strongly consider the pattern-based recommendation provided above unless you have a compelling reason not to.' : ''}
 Then respond in this exact format:
 USE_EXISTING: [folder name] 
 or 
@@ -362,11 +381,9 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
     // Process the suggestion
     const suggestion = response.suggestion.trim();
     
-    // Parse the response format - look for the pattern anywhere in the response
     let folderName = '';
     let useExisting = false;
     
-    // Search for USE_EXISTING or CREATE_NEW pattern in the entire response
     const useExistingMatch = suggestion.match(/USE_EXISTING:\s*([^\n]+)/i);
     const createNewMatch = suggestion.match(/CREATE_NEW:\s*([^\n]+)/i);
     
@@ -377,7 +394,6 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
       useExisting = false;
       folderName = createNewMatch[1].trim();
     } else {
-      // Fallback: try to extract a folder name from the response
       const quotedMatch = suggestion.match(/["']([^"']+)["']/);
       const colonMatch = suggestion.match(/:\s*([^\n]+)/);
       
@@ -386,7 +402,6 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
       } else if (colonMatch) {
         folderName = colonMatch[1].trim();
       } else {
-        // Last resort: use first few words of the response
         folderName = suggestion.split(/[.!?\n]/)[0].trim();
         if (folderName.length > 50) {
           folderName = folderName.substring(0, 50) + '...';
@@ -394,34 +409,26 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
       }
     }
     
-    // Remove any quotes around the folder name
     folderName = folderName.replace(/^["']|["']$/g, '');
     
-    // FIXED: Don't truncate the folder name here - we need the full path for matching
-    // The original code was truncating "Bookmarks bar > Space Exploration" to "Bookmarks bar >"
-    
-    // Update the UI with folder name in input field
-    // For display purposes, show just the folder name (not the full path)
     const displayName = folderName.includes(' > ') ? 
       folderName.split(' > ').pop() : folderName;
     
+    // Update suggestion field with stable text
+    safeUpdateText(elements.suggestedFolder, displayName);
     elements.suggestedFolder.value = displayName;
     elements.suggestedFolder.disabled = false;
     
     if (useExisting) {
-      // FIXED: Find exact match for the full folder path
       let found = false;
       Array.from(elements.folderSelect.options).forEach(option => {
-        // Exact match on the full folder path
         if (option.textContent === folderName) {
           elements.folderSelect.value = option.value;
           found = true;
-          console.log("Exact match found:", option.textContent);
-          return; // Stop after first exact match
+          return;
         }
       });
       
-      // If exact match not found, try partial match on the folder name only
       if (!found) {
         const targetFolderName = folderName.includes(' > ') ? 
           folderName.split(' > ').pop() : folderName;
@@ -430,33 +437,27 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
           if (option.textContent.endsWith(' > ' + targetFolderName)) {
             elements.folderSelect.value = option.value;
             found = true;
-            console.log("Partial match found:", option.textContent);
-            return; // Stop after first match
+            return;
           }
         });
       }
       
-      // If still not found, fall back to creating a new folder
       if (!found) {
         elements.folderSelect.value = 'new';
-        console.log("No match found, creating new folder");
       }
     } else {
-      // Set to create a new folder
       elements.folderSelect.value = 'new';
     }
     
     if (autoSaveEnabled) {
-      // Automatically save without user click
       await saveBookmark(elements);
     } else {
-      // Fall back to manual mode
-      updateStatus("", true, elements);
+      updateStatus("Ready to save!", true, elements);
+      setStatusClass(elements.statusMessage, 'success');
       elements.saveBtn.disabled = false;
     }
     
   } catch (error) {
-    // If we can't get an AI suggestion, show clear guidance to user
     elements.suggestedFolder.placeholder = "Please enter folder name";
     elements.suggestedFolder.disabled = false;
     
@@ -465,24 +466,33 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
   }
 }
 
-// Analyze existing folders to extract common categories
+// Stable class manipulation
+function setStatusClass(element, className) {
+  if (!element) return;
+  
+  // Remove existing status classes
+  element.classList.remove('success', 'error');
+  
+  // Add new class if specified
+  if (className) {
+    element.classList.add(className);
+  }
+}
+
+// Analyze existing folders
 function analyzeExistingFolders(options) {
-  // Extract folder names from options
   const folderNames = Array.from(options)
     .filter(option => option.value !== 'new' && option.value !== '')
     .map(option => {
-      // Get the last part of the path (the actual folder name)
       const parts = option.textContent.split(' > ');
       return parts[parts.length - 1];
     });
   
-  // Count occurrences of each category
   const categoryCounts = {};
   folderNames.forEach(name => {
     categoryCounts[name] = (categoryCounts[name] || 0) + 1;
   });
   
-  // Sort by frequency and take top 10
   const topCategories = Object.entries(categoryCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
@@ -492,7 +502,7 @@ function analyzeExistingFolders(options) {
   return topCategories;
 }
 
-// Save the bookmark
+// Save bookmark with stable UI
 async function saveBookmark(elements) {
   updateStatus("Saving bookmark...", false, elements);
   elements.saveBtn.disabled = true;
@@ -501,13 +511,11 @@ async function saveBookmark(elements) {
     const selectedFolder = elements.folderSelect.value;
     const notes = elements.notesInput.value;
     
-    // Prepare title with notes if provided
     let bookmarkTitle = currentPageData.title;
     if (notes) {
       bookmarkTitle += ` - ${notes}`;
     }
     
-    // Add the page summary as a note if available and user didn't add notes
     if (!notes && currentPageData.summary) {
       bookmarkTitle += ` - ${currentPageData.summary.substring(0, 100)}`;
       if (currentPageData.summary.length > 100) {
@@ -515,27 +523,21 @@ async function saveBookmark(elements) {
       }
     }
     
-    // Get the current value from the suggested folder input
     const suggestedFolderValue = elements.suggestedFolder.value.trim();
     
-    // Record this bookmark action for pattern learning
+    // Record bookmark action for pattern learning
     try {
-      // Store some metadata about this bookmark action for future learning
       chrome.storage.local.get('bookmarkingHistory', (result) => {
         const history = result.bookmarkingHistory || [];
         
-        // Use the current value in the suggestion field for storing
         let folderNameToStore;
         if (selectedFolder === 'new') {
-          // Use the value from the input field
           folderNameToStore = suggestedFolderValue;
         } else {
-          // Still use the actual folder path for existing folders
           folderNameToStore = Array.from(elements.folderSelect.options)
             .find(opt => opt.value === selectedFolder)?.textContent || '';
         }
         
-        // Add new entry
         history.push({
           url: currentPageData.url,
           title: currentPageData.title, 
@@ -543,7 +545,6 @@ async function saveBookmark(elements) {
           timestamp: Date.now()
         });
         
-        // Keep only the last 100 entries to prevent storage issues
         if (history.length > 100) {
           history.shift();
         }
@@ -551,13 +552,11 @@ async function saveBookmark(elements) {
         chrome.storage.local.set({ 'bookmarkingHistory': history });
       });
     } catch (e) {
-      // Non-critical error, continue with bookmark creation
       console.warn("Could not save bookmark action to history:", e);
     }
     
-    // Handle creating new folder if needed
+    // Handle creating new folder or using existing
     if (selectedFolder === 'new') {
-      // Use the value from the input field for the new folder name
       const newFolderName = suggestedFolderValue;
       
       if (!newFolderName) {
@@ -566,13 +565,11 @@ async function saveBookmark(elements) {
         return;
       }
       
-      // Create new folder in the Bookmarks Bar
       const newFolder = await chrome.bookmarks.create({
-        parentId: '1', // Chrome's default Bookmarks Bar ID
+        parentId: '1',
         title: newFolderName
       });
       
-      // Create bookmark in the new folder
       await chrome.bookmarks.create({
         parentId: newFolder.id,
         title: bookmarkTitle,
@@ -580,7 +577,6 @@ async function saveBookmark(elements) {
       });
       
     } else {
-      // Create bookmark in the existing folder
       await chrome.bookmarks.create({
         parentId: selectedFolder,
         title: bookmarkTitle,
@@ -588,8 +584,9 @@ async function saveBookmark(elements) {
       });
     }
     
-    updateStatus("Bookmark saved!", true, elements);
-    setTimeout(() => window.close(), 1000);
+    updateStatus("Bookmark saved successfully!", true, elements);
+    setStatusClass(elements.statusMessage, 'success');
+    setTimeout(() => window.close(), 1500);
     
   } catch (error) {
     showError("Error saving bookmark: " + error.message, elements);
@@ -597,37 +594,55 @@ async function saveBookmark(elements) {
   }
 }
 
-// Update status message
+// Stable status update
 function updateStatus(message, finished = false, elements) {
-  elements.statusText.textContent = message;
-  elements.loader.style.display = finished ? 'none' : 'inline-block';
+  if (!elements.statusText) return;
   
-  // Hide the entire status message if message is empty and finished
-  if (!message && finished) {
-    elements.statusMessage.style.display = 'none';
-  } else {
+  // Update text content safely
+  safeUpdateText(elements.statusText, message);
+  
+  // Update loader visibility
+  if (elements.loader) {
+    elements.loader.style.display = finished ? 'none' : 'inline-block';
+  }
+  
+  // Reset status classes
+  setStatusClass(elements.statusMessage, '');
+  
+  // Control status message visibility
+  if (elements.statusMessage) {
+    if (!message && finished) {
+      elements.statusMessage.style.display = 'none';
+    } else {
+      elements.statusMessage.style.display = 'flex';
+    }
+  }
+}
+
+// Show error with stable UI
+function showError(message, elements) {
+  if (!elements.statusText) return;
+  
+  safeUpdateText(elements.statusText, message);
+  setStatusClass(elements.statusMessage, 'error');
+  
+  if (elements.loader) {
+    elements.loader.style.display = 'none';
+  }
+  
+  if (elements.statusMessage) {
     elements.statusMessage.style.display = 'flex';
   }
 }
 
-// Show error message
-function showError(message, elements) {
-  elements.statusText.textContent = message;
-  elements.statusText.style.color = 'red';
-  elements.loader.style.display = 'none';
-  elements.statusMessage.style.display = 'flex';
-}
-
-// Helper function to extract context from URLs when content extraction fails
+// Extract context from URL and metadata
 function extractContextFromUrlAndMetadata(metadata) {
   let context = {};
   
-  // 1. Extract topics from title
   if (metadata.title) {
-    // Remove common web terms and extract potential topics
     const titleTerms = metadata.title
-      .replace(/\s-\s.*$/, '') // Remove site names after dash
-      .replace(/\|.*$/, '')    // Remove site names after pipe
+      .replace(/\s-\s.*$/, '')
+      .replace(/\|.*$/, '')
       .split(/\s+/)
       .filter(word => 
         word.length > 2 && 
@@ -637,15 +652,12 @@ function extractContextFromUrlAndMetadata(metadata) {
     context.titleTerms = titleTerms;
   }
   
-  // 2. Extract domain and path from URL if available
   if (metadata.url) {
     try {
       const url = new URL(metadata.url);
       
-      // Get domain without www
       const domain = url.hostname.replace('www.', '');
       
-      // Extract meaningful parts from path (removing common web paths)
       const pathParts = url.pathname.split('/')
         .filter(part => 
           part.length > 0 && 
@@ -655,7 +667,6 @@ function extractContextFromUrlAndMetadata(metadata) {
       context.domain = domain;
       context.pathParts = pathParts;
       
-      // Special case for common sites
       if (domain.includes('github.com')) {
         context.likelySite = 'Programming/GitHub';
       } else if (domain.includes('stackoverflow.com')) {
@@ -665,7 +676,6 @@ function extractContextFromUrlAndMetadata(metadata) {
       } else if (domain.includes('youtube.com')) {
         context.likelySite = 'Videos';
       }
-      // Add more site-specific logic here
     } catch (error) {
       console.error("Error parsing URL:", error);
     }

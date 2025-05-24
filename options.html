@@ -1,201 +1,228 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Bookmark Organizer Options</title>
+  <title>AI Bookmark Organizer - Settings</title>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    /* Minimal Design Variables */
+    :root {
+      --primary: #2563eb;
+      --primary-light: #3b82f6;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --background: #ffffff;
+      --surface: #f8fafc;
+      --border: #e2e8f0;
+      --border-light: #f1f5f9;
+      --success: #059669;
+      --error: #dc2626;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+      --transition: all 0.15s ease;
+    }
+
+    /* Base */
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
-      padding: 20px;
-      color: #333;
+      padding: 24px;
+      color: var(--text-primary);
+      background: var(--background);
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
       max-width: 800px;
       margin: 0 auto;
     }
-    
+
+    /* Header */
     h1 {
-      color: #1a73e8;
-      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 32px 0;
+      color: var(--text-primary);
+      letter-spacing: -0.025em;
     }
-    
-    .section {
-      background: #f9f9f9;
-      padding: 20px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    
-    .form-group {
-      margin-bottom: 15px;
-    }
-    
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: 500;
-    }
-    
-    input[type="text"], input[type="password"], input[type="range"] {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
-      box-sizing: border-box;
-    }
-    
-    .slider-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .slider-container input[type="range"] {
-      flex-grow: 1;
-    }
-    
-    .slider-value {
-      min-width: 30px;
-      text-align: center;
-    }
-    
-    button {
-      background-color: #1a73e8;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    
-    button:hover {
-      background-color: #0d62d1;
-    }
-    
-    .status {
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 4px;
-    }
-    
-    .success {
-      background-color: #d4edda;
-      color: #155724;
-    }
-    
-    .error {
-      background-color: #f8d7da;
-      color: #721c24;
-    }
-    
-    .info-text {
-      font-size: 14px;
-      color: #666;
-      margin-top: 5px;
-    }
-    
-    .instructions {
-      background: #e8f0fe;
-      padding: 15px;
-      border-radius: 8px;
-      margin-top: 30px;
-    }
-    
-    .instructions h2 {
-      margin-top: 0;
-      color: #1a73e8;
-    }
-    
-    .instructions ol {
-      padding-left: 20px;
-    }
-    
-    .instructions li {
-      margin-bottom: 10px;
-    }
-    
+
+    /* Tab Navigation */
     .tab-container {
-      margin-bottom: 20px;
+      margin-bottom: 32px;
     }
-    
+
     .tab-buttons {
       display: flex;
-      border-bottom: 1px solid #ccc;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-light);
+      overflow: hidden;
+      margin-bottom: 24px;
     }
-    
+
     .tab-button {
-      padding: 10px 15px;
-      background: none;
+      flex: 1;
+      padding: 12px 16px;
+      background: transparent;
       border: none;
-      color: #666;
+      color: var(--text-secondary);
       cursor: pointer;
       font-weight: 500;
+      font-size: 13px;
+      transition: var(--transition);
+      font-family: inherit;
     }
-    
+
+    .tab-button:hover {
+      color: var(--text-primary);
+      background: var(--background);
+    }
+
     .tab-button.active {
-      color: #1a73e8;
-      border-bottom: 2px solid #1a73e8;
+      color: var(--primary);
+      background: var(--background);
+      box-shadow: var(--shadow-sm);
     }
-    
+
+    /* Tab Content */
     .tab-content {
       display: none;
-      padding: 15px 0;
     }
-    
+
     .tab-content.active {
       display: block;
     }
-    
-    .pattern-card {
-      background: white;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
-      padding: 15px;
-      margin-bottom: 10px;
+
+    /* Sections */
+    .section {
+      background: var(--background);
+      padding: 24px;
+      border-radius: var(--radius-lg);
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
     }
-    
-    .pattern-folder {
-      font-weight: bold;
-      margin-bottom: 5px;
+
+    .section h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+      color: var(--text-primary);
     }
-    
-    .pattern-keywords {
+
+    /* Form Elements */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: var(--text-primary);
       font-size: 13px;
-      color: #666;
     }
-    
-    .keyword-chip {
-      display: inline-block;
-      background: #e0e0e0;
-      padding: 3px 8px;
-      border-radius: 12px;
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-family: inherit;
+      background: var(--background);
+      color: var(--text-primary);
+      transition: var(--transition);
+      outline: none;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    /* Slider */
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-light);
+    }
+
+    input[type="range"] {
+      flex-grow: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .slider-value {
+      min-width: 40px;
+      text-align: center;
+      font-weight: 500;
+      color: var(--primary);
+      font-size: 13px;
+    }
+
+    /* Toggle Switch */
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      border: 1px solid var(--border-light);
+    }
+
+    .setting-label {
+      font-weight: 500;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .setting-description {
       font-size: 12px;
-      margin-right: 5px;
-      margin-bottom: 5px;
+      color: var(--text-secondary);
+      margin-top: 2px;
     }
-    
-    .pattern-stats {
-      font-size: 12px;
-      color: #1a73e8;
-      margin-top: 5px;
-    }
-    
+
     .toggle-switch {
       position: relative;
       display: inline-block;
-      width: 50px;
+      width: 44px;
       height: 24px;
     }
-    
+
     .toggle-switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
-    
+
     .slider {
       position: absolute;
       cursor: pointer;
@@ -203,77 +230,215 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
+      background: var(--border);
+      transition: var(--transition);
       border-radius: 24px;
     }
-    
+
     .slider:before {
       position: absolute;
       content: "";
-      height: 16px;
-      width: 16px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      transition: var(--transition);
       border-radius: 50%;
+      box-shadow: var(--shadow-sm);
     }
-    
+
     input:checked + .slider {
-      background-color: #1a73e8;
+      background: var(--primary);
     }
-    
+
     input:checked + .slider:before {
-      transform: translateX(26px);
+      transform: translateX(20px);
     }
-    
-    .setting-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-    
-    .setting-label {
-      font-weight: 500;
-    }
-    
-    .setting-description {
-      font-size: 13px;
-      color: #666;
-      margin-top: 2px;
-    }
-    
-    .organize-button {
-      padding: 12px 24px;
-      font-size: 16px;
-      font-weight: 500;
-      background-color: #34a853;
-      margin: 10px 0;
-      color: white !important;
-      text-decoration: none !important;
-      display: inline-block;
-      border-radius: 4px;
+
+    /* Buttons */
+    button {
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       cursor: pointer;
-      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: var(--transition);
+      font-family: inherit;
+      background: var(--background);
+      color: var(--text-primary);
     }
-    
+
+    button:hover {
+      background: var(--surface);
+      border-color: var(--primary);
+    }
+
+    #saveApiBtn,
+    #savePatternBtn {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    #saveApiBtn:hover,
+    #savePatternBtn:hover {
+      background: var(--primary-light);
+    }
+
+    /* Status Messages */
+    .status {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .success {
+      background: #f0fdf4;
+      color: var(--success);
+      border: 1px solid #bbf7d0;
+    }
+
+    .error {
+      background: #fef2f2;
+      color: var(--error);
+      border: 1px solid #fecaca;
+    }
+
+    /* Info Text */
+    .info-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    /* Instructions */
+    .instructions {
+      background: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius-lg);
+      margin-top: 24px;
+      border: 1px solid var(--border-light);
+    }
+
+    .instructions h2 {
+      margin-top: 0;
+      color: var(--text-primary);
+      font-size: 16px;
+    }
+
+    .instructions ol {
+      padding-left: 20px;
+      color: var(--text-primary);
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+
+    .instructions a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .instructions a:hover {
+      text-decoration: underline;
+    }
+
+    /* Pattern Cards */
+    .pattern-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .pattern-folder {
+      font-weight: 500;
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .keyword-chip {
+      display: inline-block;
+      background: var(--background);
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .pattern-stats {
+      font-size: 11px;
+      color: var(--primary);
+      font-weight: 500;
+      margin-top: 8px;
+    }
+
+    /* Organize Button */
+    .organize-button {
+      background: var(--success);
+      color: white;
+      text-decoration: none;
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: var(--radius);
+      display: inline-block;
+      transition: var(--transition);
+    }
+
     .organize-button:hover {
-      background-color: #2d8f47;
-      color: white !important;
+      background: #047857;
+    }
+
+    /* Dark Mode */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+        --background: #0f172a;
+        --surface: #1e293b;
+        --border: #334155;
+        --border-light: #1e293b;
+      }
+      
+      .slider:before {
+        background: #f1f5f9;
+      }
+      
+      .success {
+        background: #064e3b;
+        border-color: #065f46;
+      }
+      
+      .error {
+        background: #7f1d1d;
+        border-color: #991b1b;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>AI Bookmark Organizer - Settings</h1>
+  <h1>AI Bookmark Organizer</h1>
   
   <div class="tab-container">
     <div class="tab-buttons">
       <button class="tab-button active" data-tab="api-settings">API Settings</button>
       <button class="tab-button" data-tab="pattern-settings">Pattern Recognition</button>
-      <button class="tab-button" data-tab="patterns">Your Bookmark Patterns</button>
-      <button class="tab-button" data-tab="organize">Organize Bookmarks</button>
+      <button class="tab-button" data-tab="patterns">Your Patterns</button>
+      <button class="tab-button" data-tab="organize">Organize</button>
       <button class="tab-button" data-tab="about">About</button>
     </div>
     
@@ -282,7 +447,7 @@
       <div class="section">
         <h2>Gemini API Configuration</h2>
         <div class="form-group">
-          <label for="apiKey">Gemini API Key</label>
+          <label for="apiKey">API Key</label>
           <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
           <p class="info-text">Your API key is stored locally on your device and is never sent to our servers.</p>
         </div>
@@ -296,9 +461,9 @@
         <ol>
           <li>Go to <a href="https://ai.google.dev/" target="_blank">Google AI Studio</a></li>
           <li>Sign in with your Google account</li>
-          <li>Go to the API keys section</li>
+          <li>Navigate to the API keys section</li>
           <li>Create a new API key</li>
-          <li>Copy and paste the key here</li>
+          <li>Copy and paste the key above</li>
         </ol>
         <p>The extension needs this API key to categorize your bookmarks using Google's Gemini AI.</p>
       </div>
@@ -327,7 +492,7 @@
             <input type="range" id="patternWeight" min="0" max="100" value="50">
             <span class="slider-value" id="patternWeightValue">50%</span>
           </div>
-          <p class="info-text">How much your existing bookmark patterns influence new suggestions. Higher values prioritize your patterns over general AI suggestions.</p>
+          <p class="info-text">How much your existing bookmark patterns influence new suggestions.</p>
         </div>
         
         <div class="setting-row">
@@ -354,8 +519,8 @@
 
         <div class="setting-row">
           <div>
-            <div class="setting-label">Automatically save bookmarks</div>
-            <div class="setting-description">Save bookmarks without manual confirmation based on AI suggestion</div>
+            <div class="setting-label">Automatically Save Bookmarks</div>
+            <div class="setting-description">Save bookmarks without manual confirmation</div>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="autoSaveBookmarks">
@@ -363,8 +528,10 @@
           </label>
         </div>
         
-        <button id="resetPatterns">Reset Learning Data</button>
-        <p class="info-text">This will clear all learned bookmark patterns and start fresh.</p>
+        <div class="form-group">
+          <button id="resetPatterns">Reset Learning Data</button>
+          <p class="info-text">This will clear all learned bookmark patterns and start fresh.</p>
+        </div>
         
         <button id="savePatternBtn">Save Pattern Settings</button>
         <div id="patternStatus" class="status" style="display: none;"></div>
@@ -375,7 +542,7 @@
     <div id="patterns" class="tab-content">
       <div class="section">
         <h2>Your Bookmark Pattern Analysis</h2>
-        <p class="info-text">These are the patterns detected in your bookmark organization. The extension uses these to make better folder suggestions.</p>
+        <p class="info-text">These are the patterns detected in your bookmark organization.</p>
         
         <div id="patternsList">
           <div class="pattern-card">
@@ -414,17 +581,17 @@
       <div class="section">
         <h2>Organize Existing Bookmarks</h2>
         <p>Have lots of unsorted bookmarks? Let AI help you organize them!</p>
-        <p>This feature will analyze all your unsorted bookmarks and suggest an organized folder structure based on their content. You can review the proposed organization before applying it.</p>
+        <p>This feature will analyze all your unsorted bookmarks and suggest an organized folder structure based on their content.</p>
         
-        <div style="text-align: center; margin-top: 30px;">
-          <a href="organize.html" target="_blank" class="organize-button" style="display: inline-block; text-decoration: none;">
+        <div style="text-align: center; margin-top: 24px;">
+          <a href="organize.html" target="_blank" class="organize-button">
             Organize My Bookmarks
           </a>
         </div>
         
-        <div class="info-text" style="margin-top: 20px;">
+        <div class="info-text" style="margin-top: 16px;">
           <strong>What this feature does:</strong>
-          <ul style="margin-top: 10px;">
+          <ul style="margin-top: 8px;">
             <li>Scans all bookmarks not in folders</li>
             <li>Analyzes their content and URLs</li>
             <li>Suggests appropriate folder categories</li>
@@ -440,15 +607,22 @@
       <div class="section">
         <h2>About AI Bookmark Organizer</h2>
         <p>This extension automatically categorizes your bookmarks using Google Gemini AI and learns from your organization patterns.</p>
-        <p>When you bookmark a page, the extension will:</p>
-        <ul>
-          <li>Analyze the page content</li>
-          <li>Learn from your existing bookmark organization</li>
-          <li>Suggest the best folder based on content and your patterns</li>
-          <li>Save the bookmark in the suggested folder or create a new one</li>
-        </ul>
-        <p><strong>NEW:</strong> Organize existing unsorted bookmarks with the new Organize feature!</p>
-        <p>Version 1.3 - Bulk Organization Edition</p>
+        
+        <div class="info-text" style="margin-top: 16px;">
+          <strong>When you bookmark a page, the extension will:</strong>
+          <ul style="margin-top: 8px;">
+            <li>Analyze the page content intelligently</li>
+            <li>Learn from your existing bookmark organization</li>
+            <li>Suggest the best folder based on content and your patterns</li>
+            <li>Save the bookmark in the suggested folder or create a new one</li>
+          </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 24px 0;">
+          <div style="font-size: 16px; color: var(--primary); font-weight: 500;">
+            Version 1.3 - Bulk Organization Edition
+          </div>
+        </div>
       </div>
     </div>
   </div>
