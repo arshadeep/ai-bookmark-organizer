@@ -389,11 +389,13 @@ PRIORITY ORDER FOR SUGGESTIONS:
 3. Suggest new folder based on domain or title terms
 
 Then respond in this exact format:
-USE_EXISTING: [folder name] 
-or 
+USE_EXISTING: [exact folder name]
+
+OR
+
 CREATE_NEW: [new folder name]
 
-The folder name should be short (1-3 words) and descriptive of the topic.`;
+The folder name must be 1-3 words maximum. Do not include any explanations, reasoning, colons, dashes, or additional text. Just the format above.`;
     } else {
       // Use the original prompt when we have content
       prompt = `Based on the webpage information below, suggest the most appropriate bookmark folder. The user has a specific way of organizing bookmarks.
