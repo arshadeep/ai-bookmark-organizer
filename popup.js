@@ -231,6 +231,7 @@ function extractFolders(bookmarkItems, path = '', result = []) {
 }
 
 // Get folder suggestion from Gemini API
+// Fixed folder selection logic in getAISuggestion function
 async function getAISuggestion(elements) {
   updateStatus("Getting AI suggestion...", false, elements);
   
@@ -291,7 +292,6 @@ async function getAISuggestion(elements) {
     let prompt;
     
     if (contextMissing) {
-      // Use a different prompt when content extraction failed
       prompt = `I need to suggest the most appropriate bookmark folder with limited information.
 
 Title: ${currentPageData.title}
@@ -322,7 +322,6 @@ CREATE_NEW: [new folder name]
 
 The folder name must be 1-3 words maximum. Do not include any explanations, reasoning, colons, dashes, or additional text. Just the format above.`;
     } else {
-      // Use the original prompt when we have content
       prompt = `Based on the webpage information below, suggest the most appropriate bookmark folder. The user has a specific way of organizing bookmarks.
 
 Title: ${currentPageData.title}
@@ -379,7 +378,6 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
       folderName = createNewMatch[1].trim();
     } else {
       // Fallback: try to extract a folder name from the response
-      // Look for text in quotes or after a colon
       const quotedMatch = suggestion.match(/["']([^"']+)["']/);
       const colonMatch = suggestion.match(/:\s*([^\n]+)/);
       
@@ -399,36 +397,49 @@ The folder name should be short (1-3 words) and descriptive of the topic.`;
     // Remove any quotes around the folder name
     folderName = folderName.replace(/^["']|["']$/g, '');
     
-    // Ensure the folder name is not too long
-    if (folderName.length > 30) {
-      // Try to intelligently truncate by finding a good break point
-      const words = folderName.split(/\s+/);
-      if (words.length > 3) {
-        folderName = words.slice(0, 3).join(' ');
-      } else {
-        folderName = folderName.substring(0, 30) + '...';
-      }
-    }
+    // FIXED: Don't truncate the folder name here - we need the full path for matching
+    // The original code was truncating "Bookmarks bar > Space Exploration" to "Bookmarks bar >"
     
     // Update the UI with folder name in input field
-    elements.suggestedFolder.value = folderName;
+    // For display purposes, show just the folder name (not the full path)
+    const displayName = folderName.includes(' > ') ? 
+      folderName.split(' > ').pop() : folderName;
+    
+    elements.suggestedFolder.value = displayName;
     elements.suggestedFolder.disabled = false;
     
     if (useExisting) {
-      // Try to find and select the existing folder
+      // FIXED: Find exact match for the full folder path
       let found = false;
       Array.from(elements.folderSelect.options).forEach(option => {
-        // Check if option text contains or ends with the folder name
-        if (option.textContent.includes(folderName) || 
-            option.textContent.endsWith(folderName)) {
+        // Exact match on the full folder path
+        if (option.textContent === folderName) {
           elements.folderSelect.value = option.value;
           found = true;
+          console.log("Exact match found:", option.textContent);
+          return; // Stop after first exact match
         }
       });
       
-      // If not found, fall back to creating a new folder
+      // If exact match not found, try partial match on the folder name only
+      if (!found) {
+        const targetFolderName = folderName.includes(' > ') ? 
+          folderName.split(' > ').pop() : folderName;
+          
+        Array.from(elements.folderSelect.options).forEach(option => {
+          if (option.textContent.endsWith(' > ' + targetFolderName)) {
+            elements.folderSelect.value = option.value;
+            found = true;
+            console.log("Partial match found:", option.textContent);
+            return; // Stop after first match
+          }
+        });
+      }
+      
+      // If still not found, fall back to creating a new folder
       if (!found) {
         elements.folderSelect.value = 'new';
+        console.log("No match found, creating new folder");
       }
     } else {
       // Set to create a new folder
