@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Bookmark Organizer</title>
+  <title>Bookmark.AI</title>
   <meta charset="UTF-8">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
-    <h1>AI Bookmark Organizer</h1>
+    <h1>Bookmark.AI</h1>
     
     <div class="bookmark-info">
       <div class="page-title" id="pageTitle">Loading page title...</div>
@@ -17,11 +17,6 @@
     <div class="status-message" id="statusMessage">
       <div class="loader" id="loader"></div>
       <span id="statusText">Analyzing page content...</span>
-    </div>
-    
-    <div class="about-section">
-      <label for="aboutInput">What is this article about? (optional)</label>
-      <input type="text" id="aboutInput" placeholder="e.g., Machine learning tutorial, Finance news, Recipe">
     </div>
     
     <div class="folder-section">
@@ -36,11 +31,6 @@
         <label for="suggestedFolder">AI Suggestion:</label>
         <input type="text" id="suggestedFolder" placeholder="Analyzing..." disabled>
       </div>
-      <div class="pattern-match" id="patternMatchContainer" style="display: none;">
-        <span class="pattern-match-icon">📊</span>
-        <span id="patternMatchText">Based on your bookmarking patterns</span>
-        <button id="patternInfoBtn" title="Learn more about pattern matching" class="info-button">?</button>
-      </div>
     </div>
     
     <div class="notes-section">
@@ -51,16 +41,6 @@
     <!-- Page summary section is now hidden but we keep the element for internal use -->
     <div class="page-summary" id="pageSummarySection" style="display: none;">
       <div id="pageSummary" class="summary-text">Generating summary...</div>
-    </div>
-    
-    <div class="pattern-info-modal" id="patternInfoModal" style="display: none;">
-      <div class="pattern-info-content">
-        <span class="close-btn" id="closePatternInfo">&times;</span>
-        <h3>Smart Pattern Recognition</h3>
-        <p>This suggestion is based on analyzing your existing bookmark organization patterns.</p>
-        <p>The extension learns how you typically organize similar content and suggests folders accordingly.</p>
-        <p>This helps maintain consistency with your personal organizational style.</p>
-      </div>
     </div>
     
     <div class="actions">
