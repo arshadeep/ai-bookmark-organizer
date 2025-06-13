@@ -120,11 +120,11 @@ function getFullFolderPath(node) {
 // Function to fetch and analyze page content
 async function fetchPageContent(url) {
   try {
-    // Create a tab in the background
+    // Create a tab in the background - REMOVED pinned: true
     const tab = await chrome.tabs.create({ 
       url: url, 
-      active: false,
-      pinned: true  // Pin the tab to make it less noticeable
+      active: false
+      // Removed: pinned: true  // This was causing the auto-pinning bug
     });
     
     // Wait for the tab to finish loading
@@ -150,7 +150,7 @@ async function fetchPageContent(url) {
       func: extractPageContent
     });
     
-    // Close the tab
+    // Close the tab immediately after content extraction
     await chrome.tabs.remove(tab.id);
     
     return result.result || {};
