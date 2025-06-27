@@ -32,10 +32,242 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
+// NEW: Enhanced bookmark utilities for new sync model
+
+/**
+ * Get the appropriate bookmarks bar folder for saving new bookmarks
+ * Prioritizes non-syncing bookmarks bar if available
+ */
+async function getDefaultBookmarksBar() {
+  try {
+    const bookmarkTree = await chrome.bookmarks.getTree();
+    const bookmarksBars = findBookmarksBars(bookmarkTree);
+    
+    // Prefer non-syncing bookmarks bar if available
+    const nonSyncingBar = bookmarksBars.find(bar => !bar.unmodifiable);
+    if (nonSyncingBar) {
+      return nonSyncingBar.id;
+    }
+    
+    // Fallback to any available bookmarks bar
+    if (bookmarksBars.length > 0) {
+      return bookmarksBars[0].id;
+    }
+    
+    // Last resort: try to find any suitable parent folder
+    const rootNodes = bookmarkTree[0].children || [];
+    for (const node of rootNodes) {
+      if (node.children) {
+        return node.id;
+      }
+    }
+    
+    throw new Error('No suitable bookmark folder found');
+  } catch (error) {
+    console.error('Error finding bookmarks bar:', error);
+    throw error;
+  }
+}
+
+/**
+ * Find all bookmarks bar folders in the bookmark tree
+ */
+function findBookmarksBars(bookmarkTree) {
+  const bookmarksBars = [];
+  
+  function traverse(nodes) {
+    for (const node of nodes) {
+      // Check if this is a bookmarks bar by index and title
+      if (node.index === 0 && node.children && 
+          (node.title === 'Bookmarks bar' || 
+           node.title === 'Bookmarks Bar' ||
+           node.id === '1')) {
+        bookmarksBars.push(node);
+      }
+      
+      if (node.children) {
+        traverse(node.children);
+      }
+    }
+  }
+  
+  if (bookmarkTree && bookmarkTree[0] && bookmarkTree[0].children) {
+    traverse(bookmarkTree[0].children);
+  }
+  
+  return bookmarksBars;
+}
+
+/**
+ * Find all "Other Bookmarks" folders in the bookmark tree
+ */
+function findOtherBookmarksFolders(bookmarkTree) {
+  const otherFolders = [];
+  
+  function traverse(nodes) {
+    for (const node of nodes) {
+      // Check if this is an "Other Bookmarks" folder
+      if (node.children && 
+          (node.title === 'Other bookmarks' || 
+           node.title === 'Other Bookmarks' ||
+           node.id === '2')) {
+        otherFolders.push(node);
+      }
+      
+      if (node.children) {
+        traverse(node.children);
+      }
+    }
+  }
+  
+  if (bookmarkTree && bookmarkTree[0] && bookmarkTree[0].children) {
+    traverse(bookmarkTree[0].children);
+  }
+  
+  return otherFolders;
+}
+
+/**
+ * Get all unsorted bookmarks from both syncing and non-syncing trees
+ */
+function getUnsortedBookmarks(bookmarkTree) {
+  const unsorted = [];
+  const bookmarksBars = findBookmarksBars(bookmarkTree);
+  const otherBookmarksFolders = findOtherBookmarksFolders(bookmarkTree);
+  
+  // Check all bookmarks bars for direct bookmarks
+  bookmarksBars.forEach(bar => {
+    if (bar.children) {
+      bar.children.forEach(child => {
+        if (child.url) { // It's a bookmark, not a folder
+          unsorted.push({
+            id: child.id,
+            title: child.title,
+            url: child.url,
+            parentId: child.parentId
+          });
+        }
+      });
+    }
+  });
+  
+  // Check all "Other Bookmarks" folders for direct bookmarks
+  otherBookmarksFolders.forEach(folder => {
+    if (folder.children) {
+      folder.children.forEach(child => {
+        if (child.url) { // It's a bookmark, not a folder
+          unsorted.push({
+            id: child.id,
+            title: child.title,
+            url: child.url,
+            parentId: child.parentId
+          });
+        }
+      });
+    }
+  });
+  
+  return unsorted;
+}
+
+/**
+ * Enhanced bookmark statistics analysis for new sync model
+ */
+function analyzeBookmarkTreeEnhanced(bookmarkNodes) {
+  const stats = {
+    totalBookmarks: 0,
+    unsortedBookmarks: 0,
+    folderCount: 0,
+    unsortedList: [],
+    existingFolders: {},
+    syncingBookmarks: 0,
+    localBookmarks: 0
+  };
+  
+  // Get unsorted bookmarks using the enhanced method
+  stats.unsortedList = getUnsortedBookmarks(bookmarkNodes);
+  stats.unsortedBookmarks = stats.unsortedList.length;
+  
+  // Count total bookmarks and folders
+  function traverse(nodes, inSyncedTree = false) {
+    for (const node of nodes) {
+      if (node.children) {
+        // It's a folder
+        if (node.title) {
+          stats.folderCount++;
+          stats.existingFolders[node.id] = {
+            title: node.title,
+            parentId: node.parentId,
+            path: getFullFolderPathEnhanced(node, bookmarkNodes),
+            unmodifiable: node.unmodifiable || false
+          };
+        }
+        
+        // Recurse into the folder
+        traverse(node.children, inSyncedTree || node.unmodifiable);
+      } else if (node.url) {
+        // It's a bookmark
+        stats.totalBookmarks++;
+        
+        if (inSyncedTree || node.unmodifiable) {
+          stats.syncingBookmarks++;
+        } else {
+          stats.localBookmarks++;
+        }
+      }
+    }
+  }
+  
+  traverse(bookmarkNodes);
+  
+  return stats;
+}
+
+/**
+ * Enhanced path building that respects the new bookmark structure
+ */
+function getFullFolderPathEnhanced(targetNode, bookmarkTree) {
+  const pathParts = [targetNode.title];
+  let currentId = targetNode.parentId;
+  
+  // Build a lookup map for faster searching
+  const nodeMap = {};
+  function buildNodeMap(nodes) {
+    for (const node of nodes) {
+      nodeMap[node.id] = node;
+      if (node.children) {
+        buildNodeMap(node.children);
+      }
+    }
+  }
+  buildNodeMap(bookmarkTree);
+  
+  // Walk up the tree
+  while (currentId && currentId !== '0') {
+    const parentNode = nodeMap[currentId];
+    if (parentNode && parentNode.title) {
+      let title = parentNode.title;
+      // Add sync indicator for root-level folders
+      if (parentNode.parentId === '0' && parentNode.unmodifiable) {
+        title += ' (Synced)';
+      } else if (parentNode.parentId === '0' && !parentNode.unmodifiable) {
+        title += ' (Local)';
+      }
+      pathParts.unshift(title);
+      currentId = parentNode.parentId;
+    } else {
+      break;
+    }
+  }
+  
+  return pathParts.join(' > ');
+}
+
+// UPDATED: Enhanced bookmark stats function
 async function updateBookmarkStats() {
   try {
     const bookmarks = await chrome.bookmarks.getTree();
-    const stats = analyzeBookmarkTree(bookmarks);
+    const stats = analyzeBookmarkTreeEnhanced(bookmarks);
     
     totalBookmarksEl.textContent = stats.totalBookmarks;
     unsortedBookmarksEl.textContent = stats.unsortedBookmarks;
@@ -50,7 +282,9 @@ async function updateBookmarkStats() {
   }
 }
 
+// LEGACY: Keep original function for backward compatibility but mark as deprecated
 function analyzeBookmarkTree(bookmarkNodes, stats = null, parentId = '0') {
+  console.warn('analyzeBookmarkTree is deprecated, use analyzeBookmarkTreeEnhanced instead');
   if (!stats) {
     stats = {
       totalBookmarks: 0,
@@ -95,6 +329,7 @@ function analyzeBookmarkTree(bookmarkNodes, stats = null, parentId = '0') {
   return stats;
 }
 
+// LEGACY: Keep original function for backward compatibility
 function getFullFolderPath(node) {
   if (!node.parentId || node.parentId === '0') {
     return node.title;
@@ -636,6 +871,7 @@ function displayProposedOrganization(proposedOrganization) {
   }
 }
 
+// UPDATED: Apply organization with new sync model support
 async function applyOrganization() {
   applyOrganizationBtn.disabled = true;
   
@@ -662,9 +898,11 @@ async function applyOrganization() {
       if (existingFolder) {
         folderId = existingFolder[0];
       } else {
-        // Create new folder in bookmarks bar
+        // Create new folder - use dynamic parent detection instead of hardcoded '1'
+        const defaultParent = await getDefaultBookmarksBar();
+        
         const newFolder = await chrome.bookmarks.create({
-          parentId: '1', // Bookmarks bar
+          parentId: defaultParent,
           title: folderName
         });
         folderId = newFolder.id;

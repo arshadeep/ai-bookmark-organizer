@@ -221,6 +221,101 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
+// NEW: Enhanced bookmark tree utilities for new sync model
+
+/**
+ * Get the appropriate bookmarks bar folder for saving new bookmarks
+ * Prioritizes non-syncing bookmarks bar if available
+ */
+async function getDefaultBookmarksBar() {
+  try {
+    const bookmarkTree = await chrome.bookmarks.getTree();
+    const bookmarksBars = findBookmarksBars(bookmarkTree);
+    
+    // Prefer non-syncing bookmarks bar if available
+    const nonSyncingBar = bookmarksBars.find(bar => !bar.unmodifiable);
+    if (nonSyncingBar) {
+      return nonSyncingBar.id;
+    }
+    
+    // Fallback to any available bookmarks bar
+    if (bookmarksBars.length > 0) {
+      return bookmarksBars[0].id;
+    }
+    
+    // Last resort: try to find any suitable parent folder
+    const rootNodes = bookmarkTree[0].children || [];
+    for (const node of rootNodes) {
+      if (node.children) {
+        return node.id;
+      }
+    }
+    
+    throw new Error('No suitable bookmark folder found');
+  } catch (error) {
+    console.error('Error finding bookmarks bar:', error);
+    throw error;
+  }
+}
+
+/**
+ * Find all bookmarks bar folders in the bookmark tree
+ */
+function findBookmarksBars(bookmarkTree) {
+  const bookmarksBars = [];
+  
+  function traverse(nodes) {
+    for (const node of nodes) {
+      // Check if this is a bookmarks bar by index and title
+      if (node.index === 0 && node.children && 
+          (node.title === 'Bookmarks bar' || 
+           node.title === 'Bookmarks Bar' ||
+           node.id === '1')) {
+        bookmarksBars.push(node);
+      }
+      
+      if (node.children) {
+        traverse(node.children);
+      }
+    }
+  }
+  
+  if (bookmarkTree && bookmarkTree[0] && bookmarkTree[0].children) {
+    traverse(bookmarkTree[0].children);
+  }
+  
+  return bookmarksBars;
+}
+
+/**
+ * Find all "Other Bookmarks" folders in the bookmark tree
+ */
+function findOtherBookmarksFolders(bookmarkTree) {
+  const otherFolders = [];
+  
+  function traverse(nodes) {
+    for (const node of nodes) {
+      // Check if this is an "Other Bookmarks" folder
+      if (node.children && 
+          (node.title === 'Other bookmarks' || 
+           node.title === 'Other Bookmarks' ||
+           node.id === '2')) {
+        otherFolders.push(node);
+      }
+      
+      if (node.children) {
+        traverse(node.children);
+      }
+    }
+  }
+  
+  if (bookmarkTree && bookmarkTree[0] && bookmarkTree[0].children) {
+    traverse(bookmarkTree[0].children);
+  }
+  
+  return otherFolders;
+}
+
 // Function to analyze user's existing bookmarks and their organization patterns
 async function analyzeUserBookmarkPatterns() {
   // Get all bookmarks
@@ -229,20 +324,34 @@ async function analyzeUserBookmarkPatterns() {
   // Extract all folders and their bookmarks
   const folderContents = {};
   
-  // Recursive function to process bookmark tree
-  function processBookmarkItems(items, path = '') {
+  // Recursive function to process bookmark tree (UPDATED for new sync model)
+  function processBookmarkItems(items, path = '', level = 0) {
     for (const item of items) {
       if (item.children) {
         // It's a folder
-        const folderPath = path ? `${path} > ${item.title}` : item.title;
-        folderContents[item.id] = {
-          path: folderPath,
-          title: item.title,
-          bookmarks: []
-        };
+        let displayTitle = item.title;
+        
+        // Add sync status for clarity (only for root-level folders)
+        if (level === 1 && item.unmodifiable) {
+          displayTitle += ' (Synced)';
+        } else if (level === 1 && !item.unmodifiable && item.title) {
+          displayTitle += ' (Local)';
+        }
+        
+        const folderPath = path ? `${path} > ${displayTitle}` : displayTitle;
+        
+        // Skip empty or root folders
+        if (item.title) {
+          folderContents[item.id] = {
+            path: folderPath,
+            title: displayTitle,
+            bookmarks: [],
+            unmodifiable: item.unmodifiable || false
+          };
+        }
         
         // Process children
-        processBookmarkItems(item.children, folderPath);
+        processBookmarkItems(item.children, folderPath, level + 1);
       } else if (item.url) {
         // It's a bookmark, add to parent folder
         const parentId = item.parentId;
@@ -256,7 +365,7 @@ async function analyzeUserBookmarkPatterns() {
     }
   }
   
-  processBookmarkItems(bookmarks);
+  processBookmarkItems(bookmarks, '', 0);
   return folderContents;
 }
 
@@ -296,7 +405,8 @@ async function extractFolderKeywords(folderContents) {
       path: folder.path,
       title: folder.title,
       keywords: sortedWords,
-      bookmarkCount: folder.bookmarks.length
+      bookmarkCount: folder.bookmarks.length,
+      unmodifiable: folder.unmodifiable
     };
   }
   
@@ -350,7 +460,8 @@ async function findBestFolder(pageContent, title, userFolderKeywords) {
     folderScores[folderId] = {
       path: folder.path,
       score: score,
-      confidence: score > 1 ? "high" : (score > 0.5 ? "medium" : "low")
+      confidence: score > 1 ? "high" : (score > 0.5 ? "medium" : "low"),
+      unmodifiable: folder.unmodifiable
     };
   }
   
@@ -364,7 +475,8 @@ async function findBestFolder(pageContent, title, userFolderKeywords) {
         id: sortedFolders[0][0], 
         path: sortedFolders[0][1].path,
         confidence: sortedFolders[0][1].confidence,
-        score: sortedFolders[0][1].score
+        score: sortedFolders[0][1].score,
+        unmodifiable: sortedFolders[0][1].unmodifiable
       } 
     : null;
 }

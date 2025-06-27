@@ -9,7 +9,7 @@ const patternWeightSlider = document.getElementById('patternWeight');
 const patternWeightValue = document.getElementById('patternWeightValue');
 const considerHierarchyToggle = document.getElementById('considerHierarchy');
 const autoUpdatePatternsToggle = document.getElementById('autoUpdatePatterns');
-const autoSaveBookmarksToggle = document.getElementById('autoSaveBookmarks');  // ← NEW
+const autoSaveBookmarksToggle = document.getElementById('autoSaveBookmarks');
 const resetPatternsButton = document.getElementById('resetPatterns');
 const savePatternButton = document.getElementById('savePatternBtn');
 const patternStatusDiv = document.getElementById('patternStatus');
@@ -27,9 +27,88 @@ const defaultPatternSettings = {
   enablePatterns: true,
   patternWeight: 50,
   considerHierarchy: true,
-  autoSaveBookmarks: false,  // ← NEW
+  autoSaveBookmarks: false,
   autoUpdatePatterns: true
 };
+
+// NEW: Enhanced bookmark utilities for new sync model
+
+/**
+ * Enhanced folder extraction that handles multiple bookmark trees
+ */
+function extractFoldersEnhanced(bookmarkItems, path = '', result = [], level = 0) {
+  for (const item of bookmarkItems) {
+    if (item.children) {
+      let currentPath = path;
+      let displayTitle = item.title;
+      
+      // Add sync status indicator for root-level folders
+      if (level === 1 && item.unmodifiable) {
+        displayTitle += ' (Synced)';
+      } else if (level === 1 && !item.unmodifiable && item.title) {
+        displayTitle += ' (Local)';
+      }
+      
+      if (item.title) {
+        currentPath = path ? `${path} > ${displayTitle}` : displayTitle;
+        
+        // Only add non-root folders to the result
+        if (level > 0) {
+          result.push({ 
+            id: item.id, 
+            path: currentPath,
+            unmodifiable: item.unmodifiable || false,
+            level: level
+          });
+        }
+      }
+      
+      // Recurse into the folder
+      extractFoldersEnhanced(item.children, currentPath, result, level + 1);
+    }
+  }
+  return result;
+}
+
+/**
+ * Enhanced path building that respects the new bookmark structure
+ */
+function getFullFolderPathEnhanced(targetNode, bookmarkTree) {
+  const pathParts = [targetNode.title];
+  let currentId = targetNode.parentId;
+  
+  // Build a lookup map for faster searching
+  const nodeMap = {};
+  function buildNodeMap(nodes) {
+    for (const node of nodes) {
+      nodeMap[node.id] = node;
+      if (node.children) {
+        buildNodeMap(node.children);
+      }
+    }
+  }
+  buildNodeMap(bookmarkTree);
+  
+  // Walk up the tree
+  while (currentId && currentId !== '0') {
+    const parentNode = nodeMap[currentId];
+    if (parentNode && parentNode.title) {
+      let title = parentNode.title;
+      // Add sync indicator for root-level folders
+      if (parentNode.parentId === '0' && parentNode.unmodifiable) {
+        title += ' (Synced)';
+      } else if (parentNode.parentId === '0' && !parentNode.unmodifiable) {
+        title += ' (Local)';
+      }
+      pathParts.unshift(title);
+      currentId = parentNode.parentId;
+    } else {
+      break;
+    }
+  }
+  
+  return pathParts.join(' > ');
+}
 
 // Load all settings when the page loads
 document.addEventListener('DOMContentLoaded', () => {
@@ -112,7 +191,7 @@ async function loadPatternSettings() {
     patternWeightValue.textContent = settings.patternWeight + '%';
     considerHierarchyToggle.checked = settings.considerHierarchy;
     autoUpdatePatternsToggle.checked = settings.autoUpdatePatterns;
-    autoSaveBookmarksToggle.checked = settings.autoSaveBookmarks;  // ← RESTORED
+    autoSaveBookmarksToggle.checked = settings.autoSaveBookmarks;
     
   } catch (error) {
     showPatternStatus('Error loading pattern settings: ' + error.message, false);
@@ -149,7 +228,7 @@ async function savePatternSettings() {
       patternWeight: parseInt(patternWeightSlider.value),
       considerHierarchy: considerHierarchyToggle.checked,
       autoUpdatePatterns: autoUpdatePatternsToggle.checked,
-      autoSaveBookmarks:  autoSaveBookmarksToggle.checked    // ← NEW
+      autoSaveBookmarks: autoSaveBookmarksToggle.checked
     };
     
     await chrome.storage.local.set({ 'patternSettings': settings });
@@ -269,7 +348,7 @@ async function updatePatternsList() {
   }
 }
 
-// Analyze bookmark patterns
+// UPDATED: Analyze bookmark patterns with new sync model support
 async function analyzePatterns() {
   // First, get all bookmarks
   const bookmarks = await chrome.bookmarks.getTree();
@@ -277,24 +356,34 @@ async function analyzePatterns() {
   // Extract all folders and their bookmarks
   const folderContents = {};
   
-  // Recursive function to process bookmark tree
-  function processBookmarkItems(items, path = '') {
+  // Recursive function to process bookmark tree (UPDATED for new sync model)
+  function processBookmarkItems(items, path = '', level = 0) {
     for (const item of items) {
       if (item.children) {
         // It's a folder
-        const folderPath = path ? `${path} > ${item.title}` : item.title;
+        let displayTitle = item.title;
+        
+        // Add sync status for clarity (only for root-level folders)
+        if (level === 1 && item.unmodifiable) {
+          displayTitle += ' (Synced)';
+        } else if (level === 1 && !item.unmodifiable && item.title) {
+          displayTitle += ' (Local)';
+        }
+        
+        const folderPath = path ? `${path} > ${displayTitle}` : displayTitle;
         
         // Skip empty or root folders
         if (item.title) {
           folderContents[item.id] = {
             path: folderPath,
-            title: item.title,
-            bookmarks: []
+            title: displayTitle,
+            bookmarks: [],
+            unmodifiable: item.unmodifiable || false
           };
         }
         
         // Process children
-        processBookmarkItems(item.children, folderPath);
+        processBookmarkItems(item.children, folderPath, level + 1);
       } else if (item.url) {
         // It's a bookmark, add to parent folder
         const parentId = item.parentId;
@@ -309,7 +398,7 @@ async function analyzePatterns() {
   }
   
   // Process the bookmark tree
-  processBookmarkItems(bookmarks);
+  processBookmarkItems(bookmarks, '', 0);
   
   // Now extract keywords from folders with enough bookmarks
   const folderKeywords = {};
@@ -355,7 +444,8 @@ async function analyzePatterns() {
       title: folder.title,
       keywords: sortedWords,
       bookmarkCount: folder.bookmarks.length,
-      confidence: confidence
+      confidence: confidence,
+      unmodifiable: folder.unmodifiable
     };
   }
   
@@ -407,7 +497,19 @@ function displayPatterns(folderKeywords) {
     // Create stats element
     const statsElem = document.createElement('div');
     statsElem.className = 'pattern-stats';
-    statsElem.textContent = `${pattern.bookmarkCount} bookmarks · ${pattern.confidence} confidence`;
+    
+    // Add sync status if applicable
+    let syncStatus = '';
+    if (pattern.unmodifiable) {
+      syncStatus = ' · Synced folder';
+    } else if (pattern.path.includes('(Local)') || pattern.path.includes('(Synced)')) {
+      // Already has status in path
+      syncStatus = '';
+    } else {
+      syncStatus = ' · Local folder';
+    }
+    
+    statsElem.textContent = `${pattern.bookmarkCount} bookmarks · ${pattern.confidence} confidence${syncStatus}`;
     patternCard.appendChild(statsElem);
     
     // Add the card to the patterns list

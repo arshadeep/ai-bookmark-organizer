@@ -93,6 +93,109 @@ chrome.storage.local.get(
   }
 );
 
+// NEW: Enhanced bookmark utilities for new sync model
+
+/**
+ * Get the appropriate bookmarks bar folder for saving new bookmarks
+ * Prioritizes non-syncing bookmarks bar if available
+ */
+async function getDefaultBookmarksBar() {
+  try {
+    const bookmarkTree = await chrome.bookmarks.getTree();
+    const bookmarksBars = findBookmarksBars(bookmarkTree);
+    
+    // Prefer non-syncing bookmarks bar if available
+    const nonSyncingBar = bookmarksBars.find(bar => !bar.unmodifiable);
+    if (nonSyncingBar) {
+      return nonSyncingBar.id;
+    }
+    
+    // Fallback to any available bookmarks bar
+    if (bookmarksBars.length > 0) {
+      return bookmarksBars[0].id;
+    }
+    
+    // Last resort: try to find any suitable parent folder
+    const rootNodes = bookmarkTree[0].children || [];
+    for (const node of rootNodes) {
+      if (node.children) {
+        return node.id;
+      }
+    }
+    
+    throw new Error('No suitable bookmark folder found');
+  } catch (error) {
+    console.error('Error finding bookmarks bar:', error);
+    throw error;
+  }
+}
+
+/**
+ * Find all bookmarks bar folders in the bookmark tree
+ */
+function findBookmarksBars(bookmarkTree) {
+  const bookmarksBars = [];
+  
+  function traverse(nodes) {
+    for (const node of nodes) {
+      // Check if this is a bookmarks bar by index and title
+      if (node.index === 0 && node.children && 
+          (node.title === 'Bookmarks bar' || 
+           node.title === 'Bookmarks Bar' ||
+           node.id === '1')) {
+        bookmarksBars.push(node);
+      }
+      
+      if (node.children) {
+        traverse(node.children);
+      }
+    }
+  }
+  
+  if (bookmarkTree && bookmarkTree[0] && bookmarkTree[0].children) {
+    traverse(bookmarkTree[0].children);
+  }
+  
+  return bookmarksBars;
+}
+
+/**
+ * Enhanced folder extraction that handles multiple bookmark trees
+ */
+function extractFoldersEnhanced(bookmarkItems, path = '', result = [], level = 0) {
+  for (const item of bookmarkItems) {
+    if (item.children) {
+      let currentPath = path;
+      let displayTitle = item.title;
+      
+      // Add sync status indicator for root-level folders
+      if (level === 1 && item.unmodifiable) {
+        displayTitle += ' (Synced)';
+      } else if (level === 1 && !item.unmodifiable && item.title) {
+        displayTitle += ' (Local)';
+      }
+      
+      if (item.title) {
+        currentPath = path ? `${path} > ${displayTitle}` : displayTitle;
+        
+        // Only add non-root folders to the result
+        if (level > 0) {
+          result.push({ 
+            id: item.id, 
+            path: currentPath,
+            unmodifiable: item.unmodifiable || false,
+            level: level
+          });
+        }
+      }
+      
+      // Recurse into the folder
+      extractFoldersEnhanced(item.children, currentPath, result, level + 1);
+    }
+  }
+  return result;
+}
+
 // Main initialization function
 async function initializePopup(elements) {
   try {
@@ -204,7 +307,7 @@ function handleContentScriptFailure(elements) {
   });
 }
 
-// Load bookmark folders with stable updates
+// Load bookmark folders with stable updates (UPDATED for new sync model)
 async function loadBookmarkFolders(elements) {
   // Don't change the select content until we have the data
   const originalContent = elements.folderSelect.innerHTML;
@@ -212,13 +315,20 @@ async function loadBookmarkFolders(elements) {
   
   try {
     const bookmarks = await chrome.bookmarks.getTree();
-    const folders = extractFolders(bookmarks);
+    const folders = extractFoldersEnhanced(bookmarks);
     
     // Build the complete HTML first, then update in one operation
     let optionsHtml = '';
     
-    // Add default option for root
-    optionsHtml += '<option value="1">Bookmarks Bar</option>';
+    // Add default option for root - use dynamic detection
+    try {
+      const defaultBookmarksBar = await getDefaultBookmarksBar();
+      const defaultBarName = await getBookmarksBarName(bookmarks);
+      optionsHtml += `<option value="${defaultBookmarksBar}">${defaultBarName}</option>`;
+    } catch (error) {
+      console.warn("Could not find default bookmarks bar, using fallback");
+      optionsHtml += '<option value="1">Bookmarks Bar</option>';
+    }
     
     // Add all other folders
     folders.forEach(folder => {
@@ -240,19 +350,23 @@ async function loadBookmarkFolders(elements) {
   }
 }
 
-// Extract folders from bookmarks tree
-function extractFolders(bookmarkItems, path = '', result = []) {
-  for (const item of bookmarkItems) {
-    if (item.children) {
-      let currentPath = path;
-      if (item.title) {
-        currentPath = path ? `${path} > ${item.title}` : item.title;
-        result.push({ id: item.id, path: currentPath });
-      }
-      extractFolders(item.children, currentPath, result);
+// NEW: Get the name of the default bookmarks bar
+async function getBookmarksBarName(bookmarkTree) {
+  const bookmarksBars = findBookmarksBars(bookmarkTree);
+  
+  if (bookmarksBars.length === 1) {
+    return bookmarksBars[0].title || 'Bookmarks Bar';
+  } else if (bookmarksBars.length > 1) {
+    // Multiple bars - show which one we're using
+    const nonSyncingBar = bookmarksBars.find(bar => !bar.unmodifiable);
+    if (nonSyncingBar) {
+      return `${nonSyncingBar.title} (Local)`;
+    } else {
+      return `${bookmarksBars[0].title} (Synced)`;
     }
   }
-  return result;
+  
+  return 'Bookmarks Bar';
 }
 
 // Get AI suggestion with stable UI updates
@@ -502,7 +616,7 @@ function analyzeExistingFolders(options) {
   return topCategories;
 }
 
-// Save bookmark with stable UI
+// Save bookmark with stable UI (UPDATED for new sync model)
 async function saveBookmark(elements) {
   updateStatus("Saving bookmark...", false, elements);
   elements.saveBtn.disabled = true;
@@ -555,7 +669,7 @@ async function saveBookmark(elements) {
       console.warn("Could not save bookmark action to history:", e);
     }
     
-    // Handle creating new folder or using existing
+    // Handle creating new folder or using existing (UPDATED for new sync model)
     if (selectedFolder === 'new') {
       const newFolderName = suggestedFolderValue;
       
@@ -565,8 +679,11 @@ async function saveBookmark(elements) {
         return;
       }
       
+      // Use dynamic parent detection instead of hardcoded '1'
+      const defaultParent = await getDefaultBookmarksBar();
+      
       const newFolder = await chrome.bookmarks.create({
-        parentId: '1',
+        parentId: defaultParent,
         title: newFolderName
       });
       
